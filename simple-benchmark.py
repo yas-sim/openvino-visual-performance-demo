@@ -3,28 +3,14 @@ import sys
 import glob
 import time
 import argparse
-import threading
 
 import cv2
 import numpy as np
 import yaml
 
-from OpenGL.GL import *
-from OpenGL.GLU import *
-from OpenGL.GLUT import *
-
 from openvino.inference_engine import IECore
 
 inf_count = 0
-
-thread_key = 0
-exit_flag = False
-
-def display_thread():
-    global thread_key, exit_flag
-    while exit_flag == False:
-        thread_key = cv2.waitKey(200)
-
 
 class FullScreenCanvas:
     def __init__(self, winname='noname', shape=(1080, 1920, 3)):
@@ -102,14 +88,14 @@ class BenchmarkCanvas(FullScreenCanvas):
 
     def displayLogo(self):
         stsY = self.grid_height * self.grid_row
-        self.displayOcvImage(self.intel_logo, 850, 970)
-        self.displayOcvImage(self.openvino_logo, 950, 990)
+        self.displayOcvImage(self.intel_logo   , 830, 970)
+        self.displayOcvImage(self.openvino_logo, 970, 990)
 
     def displayModel(self, modelName):
         _, name = os.path.split(modelName)
         name,_ = os.path.splitext(name)
         stsY = self.grid_height * self.grid_row
-        cv2.putText(self.canvas, 'model: {}'.format(name), (40, 1000), cv2.FONT_HERSHEY_PLAIN, 2, (255,255,255), 2)
+        cv2.putText(self.canvas, 'model: {}'.format(name), (20, 1000), cv2.FONT_HERSHEY_PLAIN, 2, (255,255,255), 2)
 
     # elapse = sec
     def dispProgressBar(self, curItr, ttlItr, elapse, max_fps=100):
@@ -121,11 +107,11 @@ class BenchmarkCanvas(FullScreenCanvas):
         stsY = self.grid_height * self.grid_row
         cv2.rectangle(img, (1600,stsY), (1920-1,1080-1), (0,0,0), -1)
 
-        cv2.putText(img, 'Progress:', (40, stsY+ 70), cv2.FONT_HERSHEY_PLAIN, 2, (255,255,255), 2)
+        cv2.putText(img, 'Progress:', (20, stsY+ 70), cv2.FONT_HERSHEY_PLAIN, 2, (255,255,255), 2)
         progressBar(img, 200, stsY+40, 1600, stsY+80, (curItr*100)/ttlItr, (255,0,64))
         cv2.putText(img, '{}/{}'.format(curItr,ttlItr), (1640, stsY+70), cv2.FONT_HERSHEY_PLAIN, 2, (255,255,255), 2)
 
-        cv2.putText(img, 'FPS:',      (40, stsY+130), cv2.FONT_HERSHEY_PLAIN, 2, (255,255,255), 2)
+        cv2.putText(img, 'FPS:',      (20, stsY+130), cv2.FONT_HERSHEY_PLAIN, 2, (255,255,255), 2)
         progressBar(img, 200, stsY+100, 1600, stsY+140, (curItr*100/elapse)/max_fps, (128,255,0))
         cv2.putText(img, '{:5.2f} inf/sec'.format(curItr/elapse), (1640, stsY+130), cv2.FONT_HERSHEY_PLAIN, 2, (255,255,255), 2)
 
@@ -153,7 +139,7 @@ class benchmark():
             cfg_items = network_cfg[device]
             for cfg in cfg_items:
                 self.ie.set_config(cfg, device)
-                print('', cfg, device)
+                print('   ', cfg, device)
 
         self.exenet = self.ie.load_network(self.net, device, num_requests=nireq)
         self.nireq = nireq
@@ -161,7 +147,7 @@ class benchmark():
 
         disp_res = [ int(i) for i in config['display_resolution'].split('x') ]  # [1920,1080]
         self.canvas = BenchmarkCanvas(display_resolution=disp_res)
-        self.inf_slot = [ [] for i in range(self.nireq) ]
+        self.inf_slot = [ None for i in range(self.nireq) ]
         self.inf_slot_inuse = [ False for i in range(self.nireq) ]
         self.skip_count = config['display_skip_count']
         self.canvas.displayLogo()
@@ -184,7 +170,7 @@ class benchmark():
         self.inf_count += 1
         if self.inf_count % self.skip_count == 0:
             ireq = self.exenet.requests[pydata]
-            outblob, ocvimg = self.inf_slot[pydata]
+            ocvimg = self.inf_slot[pydata]
             res = ireq.output_blobs[self.outputBlobName].buffer.ravel()
             idx = (res.argsort())[::-1]
             txt = self.labels[idx[0]]
@@ -195,60 +181,49 @@ class benchmark():
 
 
     def run(self, niter=10, nireq=4, files=None, max_fps=100):
-        global thread_key
 
         print('*** CURRENT CONFIGURATION')
         met_keys = self.exenet.get_metric('SUPPORTED_METRICS')
         cfg_keys = self.exenet.get_metric('SUPPORTED_CONFIG_KEYS')
         for key in cfg_keys:
-            print('', key, self.exenet.get_config(key))
-
-        async = True
+            print('   ', key, self.exenet.get_config(key))
 
         self.inf_count = 0
         start = time.perf_counter()
-
-        key = 0
-        if async:
-            # Do inference
-            for i in range(niter):
-                req=-1
-                while req==-1:
-                    req = self.exenet.get_idle_request_id()
-                while self.inf_slot_inuse[req] == True:
-                    pass
-                self.inf_slot_inuse[req] = True
-                infreq = self.exenet.requests[req]
-                dataIdx = i % len(self.blobImages)
-                self.inf_slot[req] = [ infreq.output_blobs, self.ocvImages[dataIdx] ]
-                infreq.set_completion_callback(self.callback, req)
-                infreq.async_infer(inputs={ self.inputBlobName : self.blobImages[dataIdx] } )
-
-                if i % self.skip_count == 0:
-                    self.canvas.dispProgressBar(curItr=i, ttlItr=niter, elapse=time.perf_counter()-start, max_fps=max_fps)
-                    self.canvas.markCurrentPane()
-                    cv2.imshow(self.canvas.winname, self.canvas.canvas)
-                    #key = cv2.waitKey(1)
-                    if thread_key == 27:
-                        break
-            # Wait for completion of all infer requests
-            while self.inf_count < niter and thread_key != 27:
+        # Do inference
+        for i in range(niter):
+            request_id = self.exenet.get_idle_request_id()
+            if request_id == -1:
+                self.exenet.wait(num_requests=1, timeout=-1)
+            request_id = self.exenet.get_idle_request_id()
+            while self.inf_slot_inuse[request_id] == True:
                 pass
-            end = time.perf_counter()
-            self.canvas.dispProgressBar(curItr=niter, ttlItr=niter, elapse=end-start)
-            cv2.putText(self.canvas.canvas, 'HIT ANY KEY TO EXIT', (40, 1040), cv2.FONT_HERSHEY_PLAIN, 2, (0,255,255), 2)
-            cv2.imshow(self.canvas.winname, self.canvas.canvas)
-            time.sleep(5)
-            #cv2.waitKey(0)
-        else:
-            for i in range(niter):
-                self.exenet.infer()
-            end = time.perf_counter()
+            self.inf_slot_inuse[request_id] = True
+            infreq = self.exenet.requests[request_id]
+            dataIdx = i % len(self.blobImages)
+            self.inf_slot[request_id] = self.ocvImages[dataIdx]
+            infreq.set_completion_callback(self.callback, request_id)
+            infreq.async_infer(inputs={ self.inputBlobName : self.blobImages[dataIdx] } )
+
+            if i % self.skip_count == 0:
+                self.canvas.dispProgressBar(curItr=i, ttlItr=niter, elapse=time.perf_counter()-start, max_fps=max_fps)
+                self.canvas.markCurrentPane()
+                cv2.imshow(self.canvas.winname, self.canvas.canvas)
+                key = cv2.waitKey(1)
+                if key == 27:
+                    break
+        # Wait for completion of all infer requests
+        while self.inf_count < niter and key != 27:
+            pass
+        end = time.perf_counter()
+        self.canvas.dispProgressBar(curItr=niter, ttlItr=niter, elapse=end-start)
+        cv2.putText(self.canvas.canvas, 'HIT ANY KEY TO EXIT', (20, 1040), cv2.FONT_HERSHEY_PLAIN, 2, (0,255,255), 2)
+        cv2.imshow(self.canvas.winname, self.canvas.canvas)
+        cv2.waitKey(0)
 
 
 
 def main():
-    global exit_flag
     parser = argparse.ArgumentParser()
     parser.add_argument('-c', '--config', default='default.yml', type=str, help='input configuration file (YAML)')
     args = parser.parse_args()
@@ -263,13 +238,7 @@ def main():
     model = config['xml_model_path']
     bm = benchmark(model, device=config['target_device'], config=config)
     bm.preprocessImages(files)
-    th = threading.Thread(target=display_thread)
-    th.setDaemon(True)
-    th.start()
     bm.run(niter=config['iteration'], nireq=config['num_requests'], max_fps=config['fps_max_value'])
-
-    exit_flag = True
-    th.join()
 
 if __name__ == '__main__':
     main()
