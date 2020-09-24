@@ -3,14 +3,28 @@ import sys
 import glob
 import time
 import argparse
+import threading
 
 import cv2
 import numpy as np
 import yaml
 
+from OpenGL.GL import *
+from OpenGL.GLU import *
+from OpenGL.GLUT import *
+
 from openvino.inference_engine import IECore
 
 inf_count = 0
+
+thread_key = 0
+exit_flag = False
+
+def display_thread():
+    global thread_key, exit_flag
+    while exit_flag == False:
+        thread_key = cv2.waitKey(200)
+
 
 class FullScreenCanvas:
     def __init__(self, winname='noname', shape=(1080, 1920, 3)):
@@ -139,7 +153,7 @@ class benchmark():
             cfg_items = network_cfg[device]
             for cfg in cfg_items:
                 self.ie.set_config(cfg, device)
-                print(cfg, device)
+                print('', cfg, device)
 
         self.exenet = self.ie.load_network(self.net, device, num_requests=nireq)
         self.nireq = nireq
@@ -181,18 +195,20 @@ class benchmark():
 
 
     def run(self, niter=10, nireq=4, files=None, max_fps=100):
+        global thread_key
 
         print('*** CURRENT CONFIGURATION')
         met_keys = self.exenet.get_metric('SUPPORTED_METRICS')
         cfg_keys = self.exenet.get_metric('SUPPORTED_CONFIG_KEYS')
         for key in cfg_keys:
-            print(key, self.exenet.get_config(key))
+            print('', key, self.exenet.get_config(key))
 
         async = True
 
         self.inf_count = 0
         start = time.perf_counter()
 
+        key = 0
         if async:
             # Do inference
             for i in range(niter):
@@ -212,24 +228,27 @@ class benchmark():
                     self.canvas.dispProgressBar(curItr=i, ttlItr=niter, elapse=time.perf_counter()-start, max_fps=max_fps)
                     self.canvas.markCurrentPane()
                     cv2.imshow(self.canvas.winname, self.canvas.canvas)
-                    key = cv2.waitKey(1)
-                    if key == 27:
+                    #key = cv2.waitKey(1)
+                    if thread_key == 27:
                         break
             # Wait for completion of all infer requests
-            while self.inf_count < niter and key != 27:
+            while self.inf_count < niter and thread_key != 27:
                 pass
             end = time.perf_counter()
             self.canvas.dispProgressBar(curItr=niter, ttlItr=niter, elapse=end-start)
             cv2.putText(self.canvas.canvas, 'HIT ANY KEY TO EXIT', (40, 1040), cv2.FONT_HERSHEY_PLAIN, 2, (0,255,255), 2)
             cv2.imshow(self.canvas.winname, self.canvas.canvas)
-            cv2.waitKey(0)
+            time.sleep(5)
+            #cv2.waitKey(0)
         else:
             for i in range(niter):
                 self.exenet.infer()
             end = time.perf_counter()
 
 
+
 def main():
+    global exit_flag
     parser = argparse.ArgumentParser()
     parser.add_argument('-c', '--config', default='default.yml', type=str, help='input configuration file (YAML)')
     args = parser.parse_args()
@@ -244,7 +263,13 @@ def main():
     model = config['xml_model_path']
     bm = benchmark(model, device=config['target_device'], config=config)
     bm.preprocessImages(files)
+    th = threading.Thread(target=display_thread)
+    th.setDaemon(True)
+    th.start()
     bm.run(niter=config['iteration'], nireq=config['num_requests'], max_fps=config['fps_max_value'])
+
+    exit_flag = True
+    th.join()
 
 if __name__ == '__main__':
     main()
