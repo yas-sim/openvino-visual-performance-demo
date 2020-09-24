@@ -195,7 +195,7 @@ class benchmark():
             request_id = self.exenet.get_idle_request_id()
             if request_id == -1:
                 self.exenet.wait(num_requests=1, timeout=-1)
-            request_id = self.exenet.get_idle_request_id()
+                request_id = self.exenet.get_idle_request_id()
             while self.inf_slot_inuse[request_id] == True:
                 pass
             self.inf_slot_inuse[request_id] = True
@@ -220,7 +220,7 @@ class benchmark():
         cv2.putText(self.canvas.canvas, 'HIT ANY KEY TO EXIT', (20, 1040), cv2.FONT_HERSHEY_PLAIN, 2, (0,255,255), 2)
         cv2.imshow(self.canvas.winname, self.canvas.canvas)
         cv2.waitKey(0)
-
+        print('Time: {:8.2f} sec, Throughput: {:8.2f} inf/sec'.format(end-start, niter/(end-start)))
 
 
 def main():

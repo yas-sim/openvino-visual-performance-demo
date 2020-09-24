@@ -1,6 +1,6 @@
-# cpu-i7-4770.yml
+# i7-4770-cpu.yml
 target_device: CPU
-iteration: 10000
+iteration: 1000
 num_requests: 8
 
 display_resolution: 1920x1080
