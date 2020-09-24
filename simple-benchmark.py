@@ -225,9 +225,10 @@ class benchmark():
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('-c', '--config', default='default.yml', type=str, help='input configuration file (YAML)')
+    parser.add_argument('-c', '--config', default='default.yml', type=str, help='Input configuration file (YAML)')
     args = parser.parse_args()
 
+    # Read YAML configuration file
     with open(args.config, 'rt') as f:
         config = yaml.safe_load(f)
     #print(config)
