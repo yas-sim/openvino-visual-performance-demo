@@ -129,11 +129,11 @@ class benchmark():
         self.net = self.ie.read_network(base+'.xml', base+'.bin')
         self.inputBlobName  = next(iter(self.net.input_info))
         self.outputBlobName = next(iter(self.net.outputs)) 
-        self.inputShape  = self.net.input_info[self.inputBlobName ].tensor_desc.dims
-        self.outputShape = self.net.outputs   [self.outputBlobName].shape
+        self.inputShape  = self.net.input_info  [self.inputBlobName ].tensor_desc.dims
+        self.outputShape = self.net.outputs     [self.outputBlobName].shape
 
         # Setup network configuration parameters
-        print('*** SET CONFIGURATION')
+        print('*** SET CONFIGURATION') 
         network_cfg = config['plugin_config']
         if device in network_cfg:
             cfg_items = network_cfg[device]
@@ -171,7 +171,7 @@ class benchmark():
         if self.inf_count % self.skip_count == 0:
             ireq = self.exenet.requests[pydata]
             outblob, ocvimg = self.inf_slot[pydata]
-            res = ireq.outputs[self.outputBlobName].ravel()
+            res = ireq.output_blobs[self.outputBlobName].buffer.ravel()
             idx = (res.argsort())[::-1]
             txt = self.labels[idx[0]]
             cv2.putText(ocvimg, txt, (0, ocvimg.shape[-2]//2), cv2.FONT_HERSHEY_PLAIN, 2, (0,0,0), 5 )
