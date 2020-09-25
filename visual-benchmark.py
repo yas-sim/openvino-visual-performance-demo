@@ -253,8 +253,14 @@ def main():
 
     image_src = config['image_source_dir']
     files = glob.glob(os.path.join(image_src, '*.'+config['image_data_extension']))
+    if len(files)==0:
+        print('ERROR: No input images are found. Please check \'image_source_dir\' setting in the YAML configuration file.')
+        sys.exit(1)
 
     model = config['xml_model_path']
+    if not os.path.isfile(model):
+        print('ERROR: Model file is not found. ({})'.format(model))
+        sys.exit(1)
     bm = benchmark(model, device=config['target_device'], config=config)
     bm.preprocessImages(files)
     bm.run(niter=config['iteration'], nireq=config['num_requests'], max_fps=config['fps_max_value'])
