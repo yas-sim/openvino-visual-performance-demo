@@ -236,7 +236,7 @@ class benchmark():
             pass
         end = time.perf_counter()
         print('Time: {:8.2f} sec, Throughput: {:8.2f} inf/sec'.format(end-start, niter/(end-start)))
-        self.canvas.dispProgressBar(curItr=niter, ttlItr=niter, elapse=end-start)
+        self.canvas.dispProgressBar(curItr=niter, ttlItr=niter, elapse=end-start, max_fps=max_fps)
         cv2.imshow(self.canvas.winname, self.canvas.canvas)
         cv2.waitKey(5 * 1000)    # wait for 5 sec
 

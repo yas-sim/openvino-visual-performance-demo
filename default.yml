@@ -17,17 +17,17 @@ label_file: labels_imagenet.txt
 plugin_config:
   CPU:
     - CPU_THREADS_NUM: '4'
-    - CPU_BIND_THREAD: 'YES'                # NUMA, YES, NO
-    - CPU_THROUGHPUT_STREAMS : '4'          # KEY_CPU_THROUGHPUT_NUMA, KEY_CPU_THROUGHPUT_AUTO, or poritive integer
-#    - KEY_ENFORCE_BF16: 'YES'               # YES, NO
+    - CPU_BIND_THREAD: 'YES'                              # NUMA, YES, NO
+    - CPU_THROUGHPUT_STREAMS : '4'                        # KEY_CPU_THROUGHPUT_NUMA, KEY_CPU_THROUGHPUT_AUTO, or poritive integer
+#    - KEY_ENFORCE_BF16: 'YES'                             # YES, NO
   MYRIAD:
-    - KEY_VPU_HW_STAGES_OPTIMIZATION: 'YES'   # YES, NO
-    - KEY_VPU_COMPUTE_LAYOUT: 'VPU_AUTO'    # VPU_AUTO, VPU_NCHW, VPU_NHWC
+    - KEY_VPU_HW_STAGES_OPTIMIZATION: 'YES'               # YES, NO
+#    - KEY_VPU_COMPUTE_LAYOUT: 'VPU_AUTO'                  # VPU_AUTO, VPU_NCHW, VPU_NHWC
   GPU:
-    - KEY_TUNING_MODE: 'TUNING_DISABLED'      # TUNING_DIABLED, TUNING_CREATE, TUNING_EXISTING
-    - KEY_CLDNN_PLUGIN_PRIORITY: '0'          # 0-3, 0=Disable, 3=High
-    - KEY_CLDNN_PLUGIN_THROTTLE: '0'          # 0-3, 0=Disable, 3=High (Plugin thread priority)
-    - KEY_GPU_THROUGHPUT_STREAMS: 'KEY_GPU_THROUGHPUT_AUTO'   # KEY_GPU_THROUGHPUT_AUTO, or positive integer
+    - KEY_TUNING_MODE: 'TUNING_DISABLED'                  # TUNING_DIABLED, TUNING_CREATE, TUNING_EXISTING
+    - KEY_CLDNN_PLUGIN_PRIORITY: '0'                      # 0-3, 0=Disable, 3=High
+    - KEY_CLDNN_PLUGIN_THROTTLE: '0'                      # 0-3, 0=Disable, 3=High (Plugin thread priority)
+    - KEY_GPU_THROUGHPUT_STREAMS: 'GPU_THROUGHPUT_AUTO'   # GPU_THROUGHPUT_AUTO, or positive integer
     - KEY_EXCLUSIVE_ASYNC_REQUESTS: 'NO'
 
 # For FPS meter scaling

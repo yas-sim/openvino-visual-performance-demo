@@ -1,5 +1,5 @@
-# i7-4770-cpu.yml
-target_device: CPU
+# i7-6770HQ-gpu.yml
+target_device: GPU
 iteration: 1000
 num_requests: 8
 
@@ -28,11 +28,11 @@ plugin_config:
     - TUNING_MODE: 'TUNING_DISABLED'                      # TUNING_DIABLED, TUNING_CREATE, TUNING_EXISTING
     - CLDNN_PLUGIN_PRIORITY: '0'                          # 0-3, 0=Disable, 3=High
     - CLDNN_PLUGIN_THROTTLE: '0'                          # 0-3, 0=Disable, 3=High (Plugin thread priority)
-    - GPU_THROUGHPUT_STREAMS: 'GPU_THROUGHPUT_AUTO'       # KEY_GPU_THROUGHPUT_AUTO, or positive integer
+    - GPU_THROUGHPUT_STREAMS: 'GPU_THROUGHPUT_AUTO'       # GPU_THROUGHPUT_AUTO, or positive integer
     - EXCLUSIVE_ASYNC_REQUESTS: 'NO'
 
 # For FPS meter scaling
-fps_max_value: 100
+fps_max_value: 200
 
 # Update screen every 'display_skip_count' inferences
 display_skip_count: 30
