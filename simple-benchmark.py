@@ -13,12 +13,13 @@ from openvino.inference_engine import IECore
 inf_count = 0
 
 class FullScreenCanvas:
-    def __init__(self, winname='noname', shape=(1080, 1920, 3)):
+    def __init__(self, winname='noname', shape=(1080, 1920, 3), full_screen=True):
         self.shape   = shape
         self.winname = winname
         self.canvas  = np.zeros((self.shape), dtype=np.uint8)
-        cv2.namedWindow(self.winname, cv2.WINDOW_NORMAL)
-        cv2.setWindowProperty(self.winname, cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN)
+        if full_screen:
+            cv2.namedWindow(self.winname, cv2.WINDOW_NORMAL)
+            cv2.setWindowProperty(self.winname, cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN)
     
     def __del__(self):
         cv2.destroyAllWindows()
@@ -38,9 +39,9 @@ class FullScreenCanvas:
 
 
 class BenchmarkCanvas(FullScreenCanvas):
-    def __init__(self, display_resolution=[1920,1080]):
-        disp_res = (display_resolution[1], display_resolution[0], 3)
-        super().__init__('Benchmark', disp_res)
+    def __init__(self, display_resolution=[1920,1080], full_screen=True):
+        super().__init__('Benchmark', (display_resolution[1], display_resolution[0], 3), full_screen=full_screen)
+        self.disp_res = display_resolution
 
         # Grid area to display inference result
         self.grid_col = 6
@@ -54,12 +55,9 @@ class BenchmarkCanvas(FullScreenCanvas):
         # Status area
         self.sts_area = [ (0, int(self.shape[0]*3/4)), (self.shape[1]-1, self.shape[0]-1) ]
 
-        tmpimg = cv2.imread(os.path.join('logo', 'logo-classicblue-3000px.png'))
-        self.intel_logo = cv2.resize(tmpimg, None, fx=0.03, fy=0.03)
-        tmpimg = cv2.imread(os.path.join('logo', 'int-openvino-wht-3000.png'), cv2.IMREAD_UNCHANGED)
-        b,g,r,alpha = cv2.split(tmpimg)
-        tmpimg = cv2.merge([alpha,alpha,alpha])
-        self.openvino_logo = cv2.resize(tmpimg, None, fx=0.1, fy=0.1) 
+        # Calculate status grid size
+        self.sts_grid_size = int(self.disp_res[0] / 80)
+
 
     def calcPaneCoord(self, paneIdx):
         col =  paneIdx  % self.grid_col
@@ -88,14 +86,29 @@ class BenchmarkCanvas(FullScreenCanvas):
 
     def displayLogo(self):
         stsY = self.grid_height * self.grid_row
-        self.displayOcvImage(self.intel_logo   , 830, 970)
-        self.displayOcvImage(self.openvino_logo, 970, 990)
+        gs = self.sts_grid_size
+
+        tmpimg = cv2.imread(os.path.join('logo', 'logo-classicblue-3000px.png'))
+        h = tmpimg.shape[0]
+        tmpimg = cv2.resize(tmpimg, None, fx=(gs*4)/h, fy=(gs*4)/h)    # Logo height = 3*gs
+        self.displayOcvImage(tmpimg, gs*26, stsY+gs*7)
+
+        tmpimg = cv2.imread(os.path.join('logo', 'int-openvino-wht-3000.png'), cv2.IMREAD_UNCHANGED)
+        b,g,r,alpha = cv2.split(tmpimg)
+        tmpimg = cv2.merge([alpha,alpha,alpha])
+        h = tmpimg.shape[0]
+        tmpimg = cv2.resize(tmpimg, None, fx=(gs*4)/h, fy=(gs*4)/h) 
+        self.displayOcvImage(tmpimg, gs*32, stsY+gs*7)
 
     def displayModel(self, modelName):
         _, name = os.path.split(modelName)
         name,_ = os.path.splitext(name)
         stsY = self.grid_height * self.grid_row
-        cv2.putText(self.canvas, 'model: {}'.format(name), (20, 1000), cv2.FONT_HERSHEY_PLAIN, 2, (255,255,255), 2)
+        gs = self.sts_grid_size
+        ts = self.disp_res[0] / 960         # text size
+        tt = self.disp_res[0] / 960         # text thickness
+        tt = int(max(tt,1))
+        cv2.putText(self.canvas, 'model: {}'.format(name), (gs*1, stsY+gs*8), cv2.FONT_HERSHEY_PLAIN, ts, (255,255,255), tt)
 
     # elapse = sec
     def dispProgressBar(self, curItr, ttlItr, elapse, max_fps=100):
@@ -104,18 +117,24 @@ class BenchmarkCanvas(FullScreenCanvas):
             cv2.rectangle(img, (x0,y0), (xx,y1), color, -1)
             cv2.rectangle(img, (xx,y0), (x1,y1), (64,64,64), -1)
         img = self.canvas
-        stsY = self.grid_height * self.grid_row
-        cv2.rectangle(img, (1600,stsY), (1920-1,1080-1), (0,0,0), -1)
 
-        cv2.putText(img, 'Progress:', (20, stsY+ 70), cv2.FONT_HERSHEY_PLAIN, 2, (255,255,255), 2)
-        progressBar(img, 200, stsY+40, 1600, stsY+80, (curItr*100)/ttlItr, (255,0,64))
-        cv2.putText(img, '{}/{}'.format(curItr,ttlItr), (1640, stsY+70), cv2.FONT_HERSHEY_PLAIN, 2, (255,255,255), 2)
+        stsY  = self.grid_height * self.grid_row
+        gs = self.sts_grid_size             # status pane grid size (dot)
+        ts = self.disp_res[0] / 960         # text size
+        tt = self.disp_res[0] / 960         # text thickness
+        tt = int(max(tt,1))
+        # erase numbers on the right
+        cv2.rectangle(img, (gs*66, stsY), (self.disp_res[0]-1, self.disp_res[1]-1), (0,0,0), -1)
 
-        cv2.putText(img, 'FPS:',      (20, stsY+130), cv2.FONT_HERSHEY_PLAIN, 2, (255,255,255), 2)
-        progressBar(img, 200, stsY+100, 1600, stsY+140, (curItr*100/elapse)/max_fps, (128,255,0))
-        cv2.putText(img, '{:5.2f} inf/sec'.format(curItr/elapse), (1640, stsY+130), cv2.FONT_HERSHEY_PLAIN, 2, (255,255,255), 2)
+        cv2.putText(img, 'Progress:', (gs* 1, stsY+gs*2), cv2.FONT_HERSHEY_PLAIN, ts, (255,255,255), tt)
+        progressBar(img, gs*8, stsY+gs*1, gs*65, stsY+gs*3, (curItr*100)/ttlItr, (255,0,64))
+        cv2.putText(img, '{}/{}'.format(curItr,ttlItr)          , (gs*66, stsY+gs*2), cv2.FONT_HERSHEY_PLAIN, ts, (255,255,255), tt)
 
-        cv2.putText(img, 'Time: {:5.1f}'.format(elapse), (1640, stsY+190), cv2.FONT_HERSHEY_PLAIN, 2, (255,255,255), 2)
+        cv2.putText(img, 'FPS:'     , (gs*1, stsY+gs*5), cv2.FONT_HERSHEY_PLAIN, ts, (255,255,255), tt)
+        progressBar(img, gs*8, stsY+gs*4, gs*65, stsY+gs*6, (curItr*100/elapse)/max_fps, (128,255,0))
+        cv2.putText(img, '{:5.2f} inf/sec'.format(curItr/elapse), (gs*66, stsY+gs*5), cv2.FONT_HERSHEY_PLAIN, ts, (255,255,255), tt)
+
+        cv2.putText(img, 'Time: {:5.1f}'.format(elapse), (gs*66, stsY+gs*8), cv2.FONT_HERSHEY_PLAIN, ts, (255,255,255), tt)
 
 
 class benchmark():
@@ -146,7 +165,7 @@ class benchmark():
         self.inf_count = 0
 
         disp_res = [ int(i) for i in config['display_resolution'].split('x') ]  # [1920,1080]
-        self.canvas = BenchmarkCanvas(display_resolution=disp_res)
+        self.canvas = BenchmarkCanvas(display_resolution=disp_res, full_screen=config['full_screen'])
         self.inf_slot = [ None for i in range(self.nireq) ]
         self.inf_slot_inuse = [ False for i in range(self.nireq) ]
         self.skip_count = config['display_skip_count']
@@ -216,11 +235,10 @@ class benchmark():
         while self.inf_count < niter and key != 27:
             pass
         end = time.perf_counter()
-        self.canvas.dispProgressBar(curItr=niter, ttlItr=niter, elapse=end-start)
-        cv2.putText(self.canvas.canvas, 'HIT ANY KEY TO EXIT', (20, 1040), cv2.FONT_HERSHEY_PLAIN, 2, (0,255,255), 2)
-        cv2.imshow(self.canvas.winname, self.canvas.canvas)
-        cv2.waitKey(0)
         print('Time: {:8.2f} sec, Throughput: {:8.2f} inf/sec'.format(end-start, niter/(end-start)))
+        self.canvas.dispProgressBar(curItr=niter, ttlItr=niter, elapse=end-start)
+        cv2.imshow(self.canvas.winname, self.canvas.canvas)
+        cv2.waitKey(5 * 1000)    # wait for 5 sec
 
 
 def main():
