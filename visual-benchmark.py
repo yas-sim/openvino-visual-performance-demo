@@ -38,6 +38,7 @@ class FullScreenCanvas:
         self.setROI(img, x, y, x+w, y+h)
 
 
+
 class BenchmarkCanvas(FullScreenCanvas):
     def __init__(self, display_resolution=[1920,1080], full_screen=True):
         super().__init__('Benchmark', (display_resolution[1], display_resolution[0], 3), full_screen=full_screen)
@@ -137,12 +138,11 @@ class BenchmarkCanvas(FullScreenCanvas):
         cv2.putText(img, 'Time: {:5.1f}'.format(elapse), (gs*66, stsY+gs*8), cv2.FONT_HERSHEY_PLAIN, ts, (255,255,255), tt)
 
 
+
 class benchmark():
     def __init__(self, model, device='CPU', nireq=4, config=None):
         self.config = config
-        with open(config['label_file'], 'rt') as f:
-            self.labels = [ line.rstrip('\n') for line in f ]
-
+        self.read_labels()
         base, ext = os.path.splitext(model)
         self.ie = IECore()
         self.net = self.ie.read_network(base+'.xml', base+'.bin')
@@ -153,7 +153,7 @@ class benchmark():
 
         # Setup network configuration parameters
         print('*** SET CONFIGURATION') 
-        network_cfg = config['plugin_config']
+        network_cfg = self.config['plugin_config']
         if device in network_cfg:
             cfg_items = network_cfg[device]
             for cfg in cfg_items:
@@ -164,13 +164,22 @@ class benchmark():
         self.nireq = nireq
         self.inf_count = 0
 
-        disp_res = [ int(i) for i in config['display_resolution'].split('x') ]  # [1920,1080]
-        self.canvas = BenchmarkCanvas(display_resolution=disp_res, full_screen=config['full_screen'])
+        disp_res = [ int(i) for i in self.config['display_resolution'].split('x') ]  # [1920,1080]
+        self.canvas = BenchmarkCanvas(display_resolution=disp_res, full_screen=self.config['full_screen'])
         self.inf_slot = [ None for i in range(self.nireq) ]
         self.inf_slot_inuse = [ False for i in range(self.nireq) ]
-        self.skip_count = config['display_skip_count']
+        self.skip_count = self.config['display_skip_count']
         self.canvas.displayLogo()
         self.canvas.displayModel(model)
+
+    def read_labels(self):
+        if 'label_file' in self.config['model_config']:
+            label_file = self.config['model_config']['label_file']
+            with open(label_file, 'rt') as f:
+                self.labels = [ line.rstrip('\n') for line in f ]
+        else:
+            self.labels = None
+
 
     def preprocessImages(self, files):
         self.blobImages = []
@@ -184,20 +193,8 @@ class benchmark():
             self.ocvImages.append(img)
             self.blobImages.append(blobimg)
 
-
     def callback(self, status, pydata):
-        self.inf_count += 1
-        if self.inf_count % self.skip_count == 0:
-            ireq = self.exenet.requests[pydata]
-            ocvimg = self.inf_slot[pydata]
-            res = ireq.output_blobs[self.outputBlobName].buffer.ravel()
-            idx = (res.argsort())[::-1]
-            txt = self.labels[idx[0]]
-            cv2.putText(ocvimg, txt, (0, ocvimg.shape[-2]//2), cv2.FONT_HERSHEY_PLAIN, 2, (0,0,0), 5 )
-            cv2.putText(ocvimg, txt, (0, ocvimg.shape[-2]//2), cv2.FONT_HERSHEY_PLAIN, 2, (255,255,255), 2 )
-            self.canvas.displayPane(ocvimg)
-        self.inf_slot_inuse[pydata] = False
-
+        pass
 
     def run(self, niter=10, nireq=4, files=None, max_fps=100):
 
@@ -241,6 +238,61 @@ class benchmark():
         cv2.waitKey(5 * 1000)    # wait for 5 sec
 
 
+
+class benchmark_cnn(benchmark):
+    def __init__(self, model, device='CPU', nireq=4, config=None):
+        super().__init__(model=model, device=device, nireq=nireq, config=config)
+
+    def callback(self, status, pydata):
+        self.inf_count += 1
+        if self.inf_count % self.skip_count == 0:
+            ireq = self.exenet.requests[pydata]
+            ocvimg = self.inf_slot[pydata]
+            res = ireq.output_blobs[self.outputBlobName].buffer.ravel()
+            idx = (res.argsort())[::-1]
+            if self.labels is not None:
+                txt = self.labels[idx[0]]
+                cv2.putText(ocvimg, txt, (0, ocvimg.shape[-2]//2), cv2.FONT_HERSHEY_PLAIN, 2, (0,0,0), 5 )
+                cv2.putText(ocvimg, txt, (0, ocvimg.shape[-2]//2), cv2.FONT_HERSHEY_PLAIN, 2, (255,255,255), 2 )
+            self.canvas.displayPane(ocvimg)
+        self.inf_slot_inuse[pydata] = False
+
+    def run(self, niter=10, nireq=4, files=None, max_fps=100):
+        super().run(niter=niter, nireq=nireq, files=files, max_fps=max_fps)
+
+
+class benchmark_ssd(benchmark):
+    def __init__(self, model, device='CPU', nireq=4, config=None):
+        super().__init__(model=model, device=device, nireq=nireq, config=config)
+        self.threshold = self.config['model_config']['threshold']
+
+    def callback(self, status, pydata):
+        self.inf_count += 1
+        if self.inf_count % self.skip_count == 0:
+            ireq = self.exenet.requests[pydata]
+            ocvimg = self.inf_slot[pydata]
+            res = ireq.output_blobs[self.outputBlobName].buffer.reshape(-1,7)  # reshape to (x,7)
+            for obj in res:
+                imgid, clsid, confidence, x0, y0, x1, y1 = obj
+                H, W, C = ocvimg.shape
+                if confidence>self.threshold:    # Draw a bounding box and label when confidence>threshold
+                    clsid = int(clsid)
+                    pt0 = ( int(x0 * W), int(y0 * H) )
+                    pt1 = ( int(x1 * W), int(y1 * H) )
+                    cv2.rectangle(ocvimg, pt0, pt1, (0,0,0), 6)
+                    cv2.rectangle(ocvimg, pt0, pt1, (0,255,255), 4)
+                    if self.labels is not None:
+                        txt = self.labels[clsid]
+                        cv2.putText(ocvimg, txt, pt0, cv2.FONT_HERSHEY_PLAIN, 2, (0,0,0), 5)
+                        cv2.putText(ocvimg, txt, pt0, cv2.FONT_HERSHEY_PLAIN, 2, (255,255,255), 2)
+            self.canvas.displayPane(ocvimg)
+        self.inf_slot_inuse[pydata] = False
+    
+    def run(self, niter=10, nireq=4, files=None, max_fps=100):
+        super().run(niter=niter, nireq=nireq, files=files, max_fps=max_fps)
+
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('-c', '--config', default='default.yml', type=str, help='Input configuration file (YAML)')
@@ -255,15 +307,23 @@ def main():
     files = glob.glob(os.path.join(image_src, '*.'+config['image_data_extension']))
     if len(files)==0:
         print('ERROR: No input images are found. Please check \'image_source_dir\' setting in the YAML configuration file.')
-        sys.exit(1)
+        return 1
 
     model = config['xml_model_path']
     if not os.path.isfile(model):
         print('ERROR: Model file is not found. ({})'.format(model))
-        sys.exit(1)
-    bm = benchmark(model, device=config['target_device'], config=config)
+        return 1
+    model_type = config['model_config']['type']
+    if model_type == 'cnn':
+        bm = benchmark_cnn(model, device=config['target_device'], config=config)
+    elif model_type == 'ssd':
+        bm = benchmark_ssd(model, device=config['target_device'], config=config)
+    else:
+        print('ERROR: Unsupported type of model specified. ({})'.format(model_type))
+        return 1
     bm.preprocessImages(files)
     bm.run(niter=config['iteration'], nireq=config['num_requests'], max_fps=config['fps_max_value'])
+    return 1
 
 if __name__ == '__main__':
-    main()
+    sys.exit(main())
