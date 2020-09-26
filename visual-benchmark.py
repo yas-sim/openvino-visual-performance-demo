@@ -264,7 +264,6 @@ class benchmark_cnn(benchmark):
 class benchmark_ssd(benchmark):
     def __init__(self, model, device='CPU', nireq=4, config=None):
         super().__init__(model=model, device=device, nireq=nireq, config=config)
-        self.threshold = self.config['model_config']['threshold']
 
     def callback(self, status, pydata):
         self.inf_count += 1
@@ -272,10 +271,11 @@ class benchmark_ssd(benchmark):
             ireq = self.exenet.requests[pydata]
             ocvimg = self.inf_slot[pydata]
             res = ireq.output_blobs[self.outputBlobName].buffer.reshape(-1,7)  # reshape to (x,7)
+            threshold = self.config['model_config']['threshold']
             for obj in res:
                 imgid, clsid, confidence, x0, y0, x1, y1 = obj
                 H, W, C = ocvimg.shape
-                if confidence>self.threshold:    # Draw a bounding box and label when confidence>threshold
+                if confidence>threshold:    # Draw a bounding box and label when confidence>threshold
                     clsid = int(clsid)
                     pt0 = ( int(x0 * W), int(y0 * H) )
                     pt1 = ( int(x1 * W), int(y1 * H) )
