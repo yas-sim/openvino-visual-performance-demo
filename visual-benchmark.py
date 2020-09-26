@@ -107,7 +107,7 @@ class BenchmarkCanvas(FullScreenCanvas):
         else:
             cv2.putText(self.canvas, 'OpenVINO', (gs*32, stsY+gs*9), cv2.FONT_HERSHEY_PLAIN, 5, (255,255,255), 5)
 
-    def displayModel(self, modelName, batch, skip_count):
+    def displayModel(self, modelName, device, batch, skip_count):
         _, name = os.path.split(modelName)
         name,_ = os.path.splitext(name)
         stsY = self.grid_height * self.grid_row
@@ -115,7 +115,7 @@ class BenchmarkCanvas(FullScreenCanvas):
         ts = self.disp_res[0] / 960         # text size
         tt = self.disp_res[0] / 960         # text thickness
         tt = int(max(tt,1))
-        txt = 'model: {}'.format(name)
+        txt = 'model: {} ({})'.format(name, device)
         cv2.putText(self.canvas, txt, (gs*1, stsY+gs* 8), cv2.FONT_HERSHEY_PLAIN, ts, (255,255,255), tt)
         txt = 'batch: {}, skip frame: {}'.format(batch, skip_count)
         cv2.putText(self.canvas, txt, (gs*1, stsY+gs*10), cv2.FONT_HERSHEY_PLAIN, ts, (255,255,255), tt)
@@ -184,7 +184,7 @@ class benchmark():
         self.inf_slot_inuse = [ False for i in range(self.nireq) ]
         self.skip_count = self.config['display_skip_count']
         self.canvas.displayLogo()
-        self.canvas.displayModel(model, self.batch, self.skip_count)
+        self.canvas.displayModel(model, device, self.batch, self.skip_count)
 
     def read_labels(self):
         if 'label_file' in self.config['model_config']:
