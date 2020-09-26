@@ -89,17 +89,23 @@ class BenchmarkCanvas(FullScreenCanvas):
         stsY = self.grid_height * self.grid_row
         gs = self.sts_grid_size
 
-        tmpimg = cv2.imread(os.path.join('logo', 'logo-classicblue-3000px.png'))
-        h = tmpimg.shape[0]
-        tmpimg = cv2.resize(tmpimg, None, fx=(gs*4)/h, fy=(gs*4)/h)    # Logo height = 3*gs
-        self.displayOcvImage(tmpimg, gs*26, stsY+gs*7)
+        logo1 = os.path.join('logo', 'logo-classicblue-3000px.png')
+        logo2 = os.path.join('logo', 'int-openvino-wht-3000.png')
 
-        tmpimg = cv2.imread(os.path.join('logo', 'int-openvino-wht-3000.png'), cv2.IMREAD_UNCHANGED)
-        b,g,r,alpha = cv2.split(tmpimg)
-        tmpimg = cv2.merge([alpha,alpha,alpha])
-        h = tmpimg.shape[0]
-        tmpimg = cv2.resize(tmpimg, None, fx=(gs*4)/h, fy=(gs*4)/h) 
-        self.displayOcvImage(tmpimg, gs*32, stsY+gs*7)
+        if os.path.isdir('logo'):
+            tmpimg = cv2.imread(logo1)
+            h = tmpimg.shape[0]
+            tmpimg = cv2.resize(tmpimg, None, fx=(gs*4)/h, fy=(gs*4)/h)    # Logo height = 3*gs
+            self.displayOcvImage(tmpimg, gs*26, stsY+gs*7)
+
+            tmpimg = cv2.imread(logo2, cv2.IMREAD_UNCHANGED)
+            b,g,r,alpha = cv2.split(tmpimg)
+            tmpimg = cv2.merge([alpha,alpha,alpha])
+            h = tmpimg.shape[0]
+            tmpimg = cv2.resize(tmpimg, None, fx=(gs*4)/h, fy=(gs*4)/h) 
+            self.displayOcvImage(tmpimg, gs*32, stsY+gs*7)
+        else:
+            cv2.putText(self.canvas, 'OpenVINO', (gs*32, stsY+gs*9), cv2.FONT_HERSHEY_PLAIN, 5, (255,255,255), 5)
 
     def displayModel(self, modelName):
         _, name = os.path.split(modelName)

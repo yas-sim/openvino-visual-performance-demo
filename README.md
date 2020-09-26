@@ -2,7 +2,7 @@
 
 ## Overview
 This is an OpenVINO performance demo program. This program shows inferencing performance visually on the screen so that the audience can get the performance of the system and OpenVINO intuitively.  
-The proram supports simple image classification models.  
+The proram supports simple image classification models and SSD type of object detection models.  
 
 ![screen-shot](./resources/screen-shot.png)
 
@@ -29,3 +29,4 @@ Benchmark configuration can be defined in a YAML file. Create your own configura
 ## Tested environment
 - OpenVINO 2020.4
 - Windows 10
+- Ubuntu 18.04
