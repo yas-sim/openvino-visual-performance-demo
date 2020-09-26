@@ -152,6 +152,11 @@ class benchmark():
         base, ext = os.path.splitext(model)
         self.ie = IECore()
         self.net = self.ie.read_network(base+'.xml', base+'.bin')
+        if 'batch' in self.config['model_config']:
+            self.batch = self.config['model_config']['batch']
+        else:
+            self.batch = 1
+        self.net.batch_size = self.batch
         self.inputBlobName  = next(iter(self.net.input_info))
         self.outputBlobName = next(iter(self.net.outputs)) 
         self.inputShape  = self.net.input_info  [self.inputBlobName ].tensor_desc.dims
@@ -195,7 +200,7 @@ class benchmark():
             img = cv2.resize(img, (self.inputShape[-1], self.inputShape[-2]))
             blobimg = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
             blobimg = blobimg.transpose((2,0,1))
-            blobimg = blobimg.reshape(self.inputShape)
+            blobimg = blobimg.reshape(self.inputShape[1:])
             self.ocvImages.append(img)
             self.blobImages.append(blobimg)
 
@@ -210,10 +215,17 @@ class benchmark():
         for key in cfg_keys:
             print('   ', key, self.exenet.get_config(key))
 
+        niter = (niter//self.batch)*self.batch + (self.batch if niter % self.batch else 0)  # tweak number of iteration for batch inferencing
         self.inf_count = 0
         start = time.perf_counter()
         # Do inference
-        for i in range(niter):
+        for i in range(0, niter, self.batch):
+            input_data = np.array([], dtype=np.uint8)
+            for b in range(self.batch):
+                dataIdx = (i+b) % len(self.blobImages)
+                np.append(input_data, self.ocvImages[dataIdx])
+            input_data = input_data.reshape((-1, self.inputShape[1], self.inputShape[2], self.inputShape[3]))
+
             request_id = self.exenet.get_idle_request_id()
             if request_id == -1:
                 self.exenet.wait(num_requests=1, timeout=-1)
@@ -222,6 +234,7 @@ class benchmark():
                 pass
             self.inf_slot_inuse[request_id] = True
             infreq = self.exenet.requests[request_id]
+
             dataIdx = i % len(self.blobImages)
             self.inf_slot[request_id] = self.ocvImages[dataIdx]
             infreq.set_completion_callback(self.callback, request_id)
@@ -250,11 +263,11 @@ class benchmark_cnn(benchmark):
         super().__init__(model=model, device=device, nireq=nireq, config=config)
 
     def callback(self, status, pydata):
-        self.inf_count += 1
+        self.inf_count += self.batch
         if self.inf_count % self.skip_count == 0:
             ireq = self.exenet.requests[pydata]
             ocvimg = self.inf_slot[pydata]
-            res = ireq.output_blobs[self.outputBlobName].buffer.ravel()
+            res = ireq.output_blobs[self.outputBlobName].buffer[0]      # use only the result of the 1st batch
             idx = (res.argsort())[::-1]
             if self.labels is not None:
                 txt = self.labels[idx[0]]
@@ -272,11 +285,11 @@ class benchmark_ssd(benchmark):
         super().__init__(model=model, device=device, nireq=nireq, config=config)
 
     def callback(self, status, pydata):
-        self.inf_count += 1
+        self.inf_count += self.batch
         if self.inf_count % self.skip_count == 0:
             ireq = self.exenet.requests[pydata]
             ocvimg = self.inf_slot[pydata]
-            res = ireq.output_blobs[self.outputBlobName].buffer.reshape(-1,7)  # reshape to (x,7)
+            res = ireq.output_blobs[self.outputBlobName].buffer[0].reshape(-1,7)  # reshape to (x,7)
             threshold = self.config['model_config']['threshold']
             for obj in res:
                 imgid, clsid, confidence, x0, y0, x1, y1 = obj

@@ -14,11 +14,13 @@ xml_model_path: ./public/googlenet-v1/FP16/googlenet-v1.xml
 #xml_model_path: ./public/resnet-50/FP16/resnet-50.xml
 model_config:
   type: cnn   # cnn, ssd
+  batch: 1
   label_file: labels_imagenet.txt
 
 #xml_model_path: ./public/ssd_mobilenet_v1_coco/FP16/ssd_mobilenet_v1_coco.xml
 #model_config:
 #  type: ssd
+#  batch: 1
 #  threshold: 0.7
 #  label_file: labels_coco.txt
 
@@ -43,4 +45,4 @@ plugin_config:
 fps_max_value: 100
 
 # Update screen every 'display_skip_count' inferences
-display_skip_count: 30
+display_skip_count: 15
