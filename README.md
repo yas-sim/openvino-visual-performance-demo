@@ -9,7 +9,7 @@ The proram supports simple image classification models and SSD type of object de
 ## Prerequisites
 - OpenVINO 2020.4
 - Some Python modules  
-` pip install pyyaml,numpy`
+` pip install pyyaml,numpy,opencv-python`
 - Image files for inferencing  
   - Annotation file is not required.
   - Place image files in a directory and specify the directory in the YAML configration file.
@@ -24,7 +24,7 @@ Benchmark configuration can be defined in a YAML file. Create your own configura
  - The YAML configuration file contains the parameters for benchmarking
  - `default.yml` will be used when no configuration file is given.
 2. Run the benchmark script  
-`python simple-benchmark.py -c <config.yml>`
+`python visual-benchmark.py -c <config.yml>`
 
 ## Tested environment
 - OpenVINO 2020.4
