@@ -190,7 +190,7 @@ class benchmark():
         if 'label_file' in self.config['model_config']:
             label_file = self.config['model_config']['label_file']
             with open(label_file, 'rt') as f:
-                self.labels = [ line.rstrip('\n') for line in f ]
+                self.labels = [ line.rstrip('\n').split(',')[0] for line in f ]
         else:
             self.labels = None
 
@@ -323,7 +323,8 @@ def main():
     # Read YAML configuration file
     with open(args.config, 'rt') as f:
         config = yaml.safe_load(f)
-    #print(config)
+    #for key, val in config.items():
+    #    print(key, val)
 
     image_src = config['image_source_dir']
     files = glob.glob(os.path.join(image_src, '*.'+config['image_data_extension']))
