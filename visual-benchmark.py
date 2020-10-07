@@ -123,9 +123,10 @@ class BenchmarkCanvas(FullScreenCanvas):
     # elapse = sec
     def dispProgressBar(self, curItr, ttlItr, elapse, max_fps=100):
         def progressBar(img, x0, y0, x1, y1, val, color):
+            val = min(100, val)
             xx = int(((x1-x0)*val)/100)+x0
             cv2.rectangle(img, (x0,y0), (xx,y1), color, -1)
-            cv2.rectangle(img, (xx,y0), (x1,y1), (64,64,64), -1)
+            cv2.rectangle(img, (xx,y0), (x1,y1), (32,32,32), -1)
         img = self.canvas
 
         stsY  = self.grid_height * self.grid_row
@@ -137,17 +138,17 @@ class BenchmarkCanvas(FullScreenCanvas):
         cv2.rectangle(img, (gs*66, stsY), (self.disp_res[0]-1, self.disp_res[1]-1), (0,0,0), -1)
 
         cv2.putText(img, 'Progress:', (gs* 1, stsY+gs*2), cv2.FONT_HERSHEY_PLAIN, ts, (255,255,255), tt)
-        progressBar(img, gs*8, stsY+gs*1, gs*65, stsY+gs*3, (curItr*100)/ttlItr, (255,0,64))
+        progressBar(img, gs*8, stsY+gs*1, gs*64, stsY+gs*3, (curItr*100)/ttlItr, (255,255,32))
         cv2.putText(img, '{}/{}'.format(curItr,ttlItr)          , (gs*66, stsY+gs*2), cv2.FONT_HERSHEY_PLAIN, ts, (255,255,255), tt)
 
         cv2.putText(img, 'FPS:'     , (gs*1, stsY+gs*5), cv2.FONT_HERSHEY_PLAIN, ts, (255,255,255), tt)
-        progressBar(img, gs*8, stsY+gs*4, gs*65, stsY+gs*6, (curItr*100/elapse)/max_fps, (128,255,0))
+        progressBar(img, gs*8, stsY+gs*4, gs*64, stsY+gs*6, (curItr*100/elapse)/max_fps, (128,255,0))
         cv2.putText(img, '{:5.2f} inf/sec'.format(curItr/elapse), (gs*66, stsY+gs*5), cv2.FONT_HERSHEY_PLAIN, ts, (255,255,255), tt)
 
         cv2.putText(img, 'Time: {:5.1f}'.format(elapse), (gs*66, stsY+gs*8), cv2.FONT_HERSHEY_PLAIN, ts, (255,255,255), tt)
 
 
-
+import threading
 class benchmark():
     def __init__(self, model, device='CPU', nireq=4, config=None):
         self.config = config
@@ -185,6 +186,7 @@ class benchmark():
         self.skip_count = self.config['display_skip_count']
         self.canvas.displayLogo()
         self.canvas.displayModel(model, device, self.batch, self.skip_count)
+        self.thread_abort_flag = False
 
     def read_labels(self):
         if 'label_file' in self.config['model_config']:
@@ -211,13 +213,38 @@ class benchmark():
         pass
 
     def run(self, niter=10, nireq=4, files=None, max_fps=100):
-
         print('*** CURRENT CONFIGURATION')
         met_keys = self.exenet.get_metric('SUPPORTED_METRICS')
         cfg_keys = self.exenet.get_metric('SUPPORTED_CONFIG_KEYS')
         for key in cfg_keys:
             print('   ', key, self.exenet.get_config(key))
 
+        # Create benchmark_loop thread and run it
+        th = threading.Thread(target=self.benchmark_loop, kwargs={'niter':niter, 'nireq':nireq, 'files':files, 'max_fps':max_fps})
+        self.thread_abort_flag = False
+        start = time.perf_counter()
+        th.start()
+        while th.is_alive():
+            cv2.imshow(self.canvas.winname, self.canvas.canvas)
+            key = cv2.waitKey(100)
+            if key == 27:
+                self.thread_abort_flag = True
+                break
+        th.join()
+        end = time.perf_counter()
+
+        if self.thread_abort_flag == False:
+            # Display the rsult
+            print('Time: {:8.2f} sec, Throughput: {:8.2f} inf/sec'.format(end-start, niter/(end-start)))
+            self.canvas.dispProgressBar(curItr=niter, ttlItr=niter, elapse=end-start, max_fps=max_fps)
+            cv2.imshow(self.canvas.winname, self.canvas.canvas)
+            cv2.waitKey(5 * 1000)    # wait for 5 sec
+        else:
+            print('Benchmark aborted')
+
+
+    def benchmark_loop(self, niter, nireq, files, max_fps):
+        # Actual benchmarking thread
         niter = (niter//self.batch)*self.batch + (self.batch if niter % self.batch else 0)  # tweak number of iteration for batch inferencing
         self.inf_count = 0
         start = time.perf_counter()
@@ -246,18 +273,10 @@ class benchmark():
             if i % self.skip_count == 0:
                 self.canvas.dispProgressBar(curItr=i, ttlItr=niter, elapse=time.perf_counter()-start, max_fps=max_fps)
                 self.canvas.markCurrentPane()
-                cv2.imshow(self.canvas.winname, self.canvas.canvas)
-                key = cv2.waitKey(1)
-                if key == 27:
-                    break
+            if self.thread_abort_flag == True:
+                return
         # Wait for completion of all infer requests
-        while self.inf_count < niter and key != 27:
-            pass
-        end = time.perf_counter()
-        print('Time: {:8.2f} sec, Throughput: {:8.2f} inf/sec'.format(end-start, niter/(end-start)))
-        self.canvas.dispProgressBar(curItr=niter, ttlItr=niter, elapse=end-start, max_fps=max_fps)
-        cv2.imshow(self.canvas.winname, self.canvas.canvas)
-        cv2.waitKey(5 * 1000)    # wait for 5 sec
+        while self.inf_count < niter:   pass
 
 
 

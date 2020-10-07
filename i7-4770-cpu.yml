@@ -10,8 +10,8 @@ full_screen: True
 image_source_dir: ./imagenet
 image_data_extension: jpg
 
-xml_model_path: ./public/googlenet-v1/FP16/googlenet-v1.xml
-#xml_model_path: ./public/resnet-50/FP16/resnet-50.xml
+#xml_model_path: ./public/googlenet-v1/FP16/googlenet-v1.xml
+xml_model_path: ./public/resnet-50/FP16/resnet-50.xml
 model_config:
   type: cnn   # cnn, ssd
   batch: 1
@@ -45,4 +45,4 @@ plugin_config:
 fps_max_value: 100
 
 # Update screen every 'display_skip_count' inferences
-display_skip_count: 15
+display_skip_count: 1
