@@ -17,16 +17,20 @@ The proram supports simple image classification models and SSD type of object de
 
 ## Configuration
 Benchmark configuration can be defined in a YAML file. Create your own configuration by reffering to the `default.yml` as an example.  
-**Note:** Inference result will be updated (displayed) every `display_skip_count` times the inference is performed. You can use lower value for `display_skip_count` to increase the screen update rate but it will consume much CPU power and may have negative impact to the benchmark result.  
+**Note:** Inference result will be updated (displayed) every `display_skip_count` times the inference is performed. You can use lower value for `display_skip_count` to increase the screen update rate but it will consume much CPU power and may have negative impact to the inference performance.  
 
 ## How to run
 1. Create or modify YAML configuration file
- - The YAML configuration file contains the parameters for benchmarking
+ - The YAML configuration file contains the parameters for performance demo
  - `default.yml` will be used when no configuration file is given.
-2. Run the benchmark script  
-`python visual-benchmark.py -c <config.yml>`
+2. Run the performance demo script  
+`python visual-demo.py -c <config.yml>`
 
 ## Tested environment
 - OpenVINO 2020.4
 - Windows 10
 - Ubuntu 18.04
+
+## Update history
+ - 2020-07-10: Separated benchmark main loop to a thread. Screen update and control logic is still remain in the main thread. This minimizes the performance impact from screen update.
+
