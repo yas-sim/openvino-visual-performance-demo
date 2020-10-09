@@ -45,8 +45,8 @@ class BenchmarkCanvas(FullScreenCanvas):
         self.disp_res = display_resolution
 
         # Grid area to display inference result
-        self.grid_col = 6
-        self.grid_row = 3
+        self.grid_col = 10
+        self.grid_row = 5
         self.grid_area = [(0,0), (int(self.shape[1]), int(self.shape[0]*3/4))]
         self.grid_width  = int((self.grid_area[1][0]-self.grid_area[0][0])/self.grid_col)
         self.grid_height = int((self.grid_area[1][1]-self.grid_area[0][1])/self.grid_row)
