@@ -1,6 +1,6 @@
 # default.yml
 target_device: CPU
-iteration: 100
+iteration: 1000
 num_requests: 4
 
 display_resolution: 1920x1080
@@ -45,4 +45,4 @@ plugin_config:
 fps_max_value: 100
 
 # Update screen every 'display_skip_count' inferences
-display_skip_count: 5
+display_skip_count: 1
