@@ -10,7 +10,8 @@ full_screen: True
 image_source_dir: ./imagenet
 image_data_extension: jpg
 
-xml_model_path: ./public/googlenet-v1/FP16/googlenet-v1.xml
+#xml_model_path: ./public/googlenet-v1/FP16/googlenet-v1.xml
+xml_model_path: ./public/squeezenet1.1/FP16/squeezenet1.1.xml
 #xml_model_path: ./public/resnet-50/FP16/resnet-50.xml
 model_config:
   type: cnn   # cnn, ssd

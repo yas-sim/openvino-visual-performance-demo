@@ -18,6 +18,7 @@ from openvino.inference_engine import IECore
 inf_count = 0
 
 canvas = np.zeros([0], dtype=np.uint8)
+abort_flag = False
 
 class FullScreenCanvas:
     def __init__(self, winname='noname', shape=(1080, 1920, 3), full_screen=True):
@@ -233,6 +234,7 @@ class benchmark():
         pass
 
     def run(self, niter=10, nireq=4, files=None, max_fps=100):
+        global abort_flag
         print('*** CURRENT CONFIGURATION')
         met_keys = self.exenet.get_metric('SUPPORTED_METRICS')
         cfg_keys = self.exenet.get_metric('SUPPORTED_CONFIG_KEYS')
@@ -269,22 +271,22 @@ class benchmark():
             if i % self.skip_count == 0:
                 self.canvas.dispProgressBar(curItr=i, ttlItr=niter, elapse=time.perf_counter()-start, max_fps=max_fps)
                 self.canvas.markCurrentPane()
-            if self.thread_abort_flag == True:
-                return
+                
+            if abort_flag == True:
+                break
         # Wait for completion of all infer requests
-        while self.inf_count < niter:   pass
+        while self.inf_count < niter and abort_flag==False:   pass
 
         end = time.perf_counter()
 
-        if self.thread_abort_flag == False:
+        if abort_flag == False:
             # Display the rsult
             print('Time: {:8.2f} sec, Throughput: {:8.2f} inf/sec'.format(end-start, niter/(end-start)))
             self.canvas.dispProgressBar(curItr=niter, ttlItr=niter, elapse=end-start, max_fps=max_fps)
-            cv2.imshow(self.canvas.winname, self.canvas.canvas)
             cv2.waitKey(5 * 1000)    # wait for 5 sec
         else:
             print('Benchmark aborted')
-
+        abort_flag = True
 
 
 
@@ -300,7 +302,7 @@ class benchmark_cnn(benchmark):
             res = ireq.output_blobs[self.outputBlobName].buffer[0]      # use only the result of the 1st batch
             idx = (res.argsort())[::-1]
             if self.labels is not None:
-                txt = self.labels[idx[0]]
+                txt = self.labels[int(idx[0])]
                 cv2.putText(ocvimg, txt, (0, ocvimg.shape[-2]//2), cv2.FONT_HERSHEY_PLAIN, 2, (0,0,0), 5 )
                 cv2.putText(ocvimg, txt, (0, ocvimg.shape[-2]//2), cv2.FONT_HERSHEY_PLAIN, 2, (255,255,255), 2 )
             self.canvas.displayPane(ocvimg)
@@ -376,7 +378,11 @@ def init():
     glClearColor(0.7, 0.7, 0.7, 0.7)
 
 def idle():
+    global abort_flag
+    if abort_flag == True:
+        sys.exit(0)
     glutPostRedisplay()
+    time.sleep(1)
 
 def reshape(w, h):
     glViewport(0, 0, w, h)
@@ -385,17 +391,20 @@ def reshape(w, h):
     glOrtho(-w / 1920, w / 1920, -h / 1080, h / 1080, -1.0, 1.0)
 
 def keyboard(key, x, y):
+    global abort_flag
     # convert byte to str
     key = key.decode('utf-8')
     # press q to exit
     if key == 'q':
-        print('exit')
-        sys.exit()
-
+        abort_flag = True
 
 
 
 def main():
+    global abort_flag
+
+    abort_flag = False
+
     parser = argparse.ArgumentParser()
     parser.add_argument('-c', '--config', default='default.yml', type=str, help='Input configuration file (YAML)')
     args = parser.parse_args()
