@@ -2,8 +2,8 @@
 
 ## Overview
 This is an OpenVINO performance demo program. This program shows inferencing performance visually on the screen so that the audience can get the performance of the system and OpenVINO intuitively.  
-The proram supports simple image classification models models.  
-**NOTICE**
+The proram supports simple image classification models models.   
+**NOTICE**  
 The program has been updated for performance up. The previous program has performance bottle neck caused by OpenCV. The new version replaced some OpenCV portion with OpenGL. Also, some features such as SSD model support is dropped to simplify the program.  
 
 ![screen-shot](./resources/screen-shot.png)
@@ -15,8 +15,8 @@ The program has been updated for performance up. The previous program has perfor
 - Image files for inferencing  
   - Annotation file is not required.
   - Place image files in a directory and specify the directory in the YAML configration file.
-- Image classification IR model such as ResNet-50
-**NOTICE**
+- Image classification IR model such as ResNet-50  
+**NOTICE**  
 - The program requires GLUT. If you are using Windows, maybe you need to install GLUT separately to enable it.  
 
 ## Configuration
@@ -35,5 +35,5 @@ Benchmark configuration can be defined in a YAML file. Create your own configura
 - Ubuntu 18.04
 
 ## Update history
- - 07-10-2020: Separated benchmark main loop to a thread. Screen update and control logic is still remain in the main thread. This minimizes the performance impact from screen update.
- - 16-10-2020: Replaced OpenCV codes with OpenGL. Droped support for SSD models. 
+ - 07-10-2020: Separated benchmark main loop to a thread. Screen update and control logic is still remain in the main thread. This minimizes the performance impact from screen update.  
+ - 16-10-2020: Replaced OpenCV codes with OpenGL. Droped support for SSD models.   
