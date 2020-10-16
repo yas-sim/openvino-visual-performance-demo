@@ -85,8 +85,8 @@ class BenchmarkCanvas(FullScreenCanvas):
         x0, y0, x1, y1 = self.calcPaneCoord(idx)
         x1 -= 2
         y1 -= 2
-        #img = cv2.resize(ocvimg, (self.grid_width-2, self.grid_height-2))
-        img = ocvimg[0:self.grid_height-2, 0:self.grid_width-2, :]
+        img = cv2.resize(ocvimg, (self.grid_width-2, self.grid_height-2))
+        #img = ocvimg[0:self.grid_height-2, 0:self.grid_width-2, :]
         self.setROI(img, x0, y0, x1, y1)
 
     def markCurrentPane(self, idx=-1):
@@ -129,7 +129,7 @@ class BenchmarkCanvas(FullScreenCanvas):
         tt = int(max(tt,1))
         txt = 'model: {} ({})'.format(name, device)
         cv2.putText(canvas, txt, (gs*1, stsY+gs* 8), cv2.FONT_HERSHEY_PLAIN, ts, (255,255,255), tt)
-        txt = 'batch: {}, skip frame: {}'.format(batch, skip_count)
+        txt = 'batch: {}'.format(batch)
         cv2.putText(canvas, txt, (gs*1, stsY+gs*10), cv2.FONT_HERSHEY_PLAIN, ts, (255,255,255), tt)
 
     # elapse = sec
@@ -158,7 +158,7 @@ class BenchmarkCanvas(FullScreenCanvas):
         progressBar(img, gs*8, stsY+gs*4, gs*64, stsY+gs*6, (curItr*100/elapse)/max_fps, (128,255,0))
         cv2.putText(img, '{:5.2f} inf/sec'.format(curItr/elapse), (gs*66, stsY+gs*5), cv2.FONT_HERSHEY_PLAIN, ts, (255,255,255), tt)
 
-        cv2.putText(img, 'Time: {:5.1f}'.format(elapse), (gs*66, stsY+gs*8), cv2.FONT_HERSHEY_PLAIN, ts, (255,255,255), tt)
+        cv2.putText(img, 'Time: {:5.1f} sec'.format(elapse), (gs*66, stsY+gs*8), cv2.FONT_HERSHEY_PLAIN, ts, (255,255,255), tt)
 
 
 framebuf_lock = threading.Lock()
@@ -191,7 +191,6 @@ class benchmark():
 
         self.exenet = self.ie.load_network(self.net, device, num_requests=nireq)
         self.nireq = nireq
-        self.inf_count = 0
 
         disp_res = [ int(i) for i in self.config['display_resolution'].split('x') ]  # [1920,1080]
         self.canvas = BenchmarkCanvas(display_resolution=disp_res, full_screen=self.config['full_screen'])
@@ -199,7 +198,7 @@ class benchmark():
         self.canvas.displayLogo()
         self.canvas.displayModel(model, device, self.batch, self.skip_count)
         self.thread_abort_flag = False
-        self.infer_slot = [ [False, 0] for req in self.exenet.requests ]   # [Inuse flag, ocvimg index]
+        self.infer_slot = [ [False, 0] for i in range(self.nireq) ]   # [Inuse flag, ocvimg index]
 
     def read_labels(self):
         if 'label_file' in self.config['model_config']:
@@ -236,14 +235,16 @@ class benchmark():
 
         start = time.perf_counter()
         # Do inference
-        while self.inf_count < niter:
+        inf_kicked = 0
+        inf_done   = 0
+        while inf_done < niter:
             self.exenet.wait(num_requests=1, timeout=WaitMode.RESULT_READY)
             request_id = self.exenet.get_idle_request_id()
             infreq = self.exenet.requests[request_id]
 
             # if slot has already been in use, process the infer result
             if self.infer_slot[request_id][0] == True:
-                self.inf_count += self.batch
+                inf_done += self.batch
                 ocvIdx = self.infer_slot[request_id][1]   # OCV image index
                 ocvimg = self.ocvImages[ocvIdx].copy()
                 res = infreq.output_blobs[self.outputBlobName].buffer[0].ravel()
@@ -254,17 +255,19 @@ class benchmark():
                 self.canvas.displayPane(ocvimg)
                 self.infer_slot[request_id] = [False, 0]
 
-            dataIdx = self.inf_count % len(self.blobImages)
+            dataIdx = inf_kicked % len(self.blobImages)
             self.infer_slot[request_id] = [True, dataIdx]
             infreq.async_infer(inputs={ self.inputBlobName : self.blobImages[dataIdx] } )
+            inf_kicked += 1
 
             framebuf_lock.acquire()
-            self.canvas.dispProgressBar(curItr=self.inf_count, ttlItr=niter, elapse=time.perf_counter()-start, max_fps=max_fps)
+            self.canvas.dispProgressBar(curItr=inf_done, ttlItr=niter, elapse=time.perf_counter()-start, max_fps=max_fps)
             self.canvas.markCurrentPane()
             framebuf_lock.release()
 
             if abort_flag == True:
                 break
+
         end = time.perf_counter()
 
         if abort_flag == False:
@@ -324,7 +327,7 @@ def timer(val):
     if abort_flag == True:
         sys.exit(0)
     glutPostRedisplay()
-    glutTimerFunc(100, timer, 0)
+    glutTimerFunc(33, timer, 0)
 
 def reshape(w, h):
     glViewport(0, 0, w, h)
