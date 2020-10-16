@@ -17,6 +17,7 @@ import yaml
 from openvino.inference_engine import IECore, StatusCode, WaitMode
 
 inf_count = 0
+disp_res = [1920,1080]
 
 canvas = np.zeros([0], dtype=np.uint8)
 abort_flag = False
@@ -165,6 +166,7 @@ framebuf_lock = threading.Lock()
 
 class benchmark():
     def __init__(self, model, device='CPU', nireq=4, config=None):
+        global disp_res
         self.config = config
         self.read_labels()
         base, ext = os.path.splitext(model)
@@ -183,7 +185,7 @@ class benchmark():
         # Setup network configuration parameters
         print('*** SET CONFIGURATION') 
         network_cfg = self.config['plugin_config']
-        if device in network_cfg:
+        for device in network_cfg:
             cfg_items = network_cfg[device]
             for cfg in cfg_items:
                 self.ie.set_config(cfg, device)
@@ -330,9 +332,10 @@ def timer(val):
     glutTimerFunc(33, timer, 0)
 
 def reshape(w, h):
+    global disp_res
     glViewport(0, 0, w, h)
     glLoadIdentity()
-    glOrtho(-w / 1920, w / 1920, -h / 1080, h / 1080, -1.0, 1.0)
+    glOrtho(-w / disp_res[0], w / disp_res[0], -h / disp_res[1], h / disp_res[1], -1.0, 1.0)
 
 def keyboard(key, x, y):
     global abort_flag
@@ -343,7 +346,7 @@ def keyboard(key, x, y):
 
 
 def main():
-    global abort_flag
+    global abort_flag, disp_res
 
     abort_flag = False
 
@@ -377,8 +380,8 @@ def main():
         'max_fps':config['fps_max_value']})
     th.start()
 
-    glutInitWindowPosition(0, 0);
-    glutInitWindowSize(1920, 1080);
+    glutInitWindowPosition(0, 0)
+    glutInitWindowSize(*disp_res)
     glutInit(sys.argv)
     glutInitDisplayMode(GLUT_RGBA | GLUT_DOUBLE )
     #glutCreateWindow("Display")
