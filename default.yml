@@ -18,18 +18,11 @@ model_config:
   batch: 1
   label_file: labels_imagenet.txt
 
-#xml_model_path: ./public/ssd_mobilenet_v1_coco/FP16/ssd_mobilenet_v1_coco.xml
-#model_config:
-#  type: ssd
-#  batch: 1
-#  threshold: 0.7
-#  label_file: labels_coco.txt
-
 # Used by ie.setConfig() API to setup the plugin configuration
 plugin_config:
   CPU:
-    - CPU_THREADS_NUM: '4'
-    - CPU_BIND_THREAD: 'YES'                              # NUMA, YES, NO
+    - CPU_THREADS_NUM: '8'
+    - CPU_BIND_THREAD: 'NO'                              # NUMA, YES, NO
     - CPU_THROUGHPUT_STREAMS : '4'                        # KEY_CPU_THROUGHPUT_NUMA, KEY_CPU_THROUGHPUT_AUTO, or poritive integer
 #    - KEY_ENFORCE_BF16: 'YES'                             # YES, NO
   MYRIAD:
