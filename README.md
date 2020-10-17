@@ -10,6 +10,8 @@ The program has been updated for performance up. The previous program has perfor
 
 ## Prerequisites
 - OpenVINO 2020.4
+- OpenGL, GLUT (FreeGLUT)  
+`(Ubuntu) sudo apt install python-opengl freeglut3 freeglut3-dev`   
 - Some Python modules  
 ` pip install pyyaml,numpy,opencv-python,PyOpenGL,PyOpenGL_accelerate`
 - Image files for inferencing  
