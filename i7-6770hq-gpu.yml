@@ -1,6 +1,6 @@
 # i7-6770HQ-gpu.yml
 target_device: GPU
-iteration: 1000
+iteration: 5000
 num_requests: 8
 
 display_resolution: 1920x1080
@@ -43,7 +43,7 @@ plugin_config:
     - EXCLUSIVE_ASYNC_REQUESTS: 'NO'
 
 # For FPS meter scaling
-fps_max_value: 200
+fps_max_value: 600
 
 # Update screen every 'display_skip_count' inferences
-display_skip_count: 30
+display_skip_count: 1

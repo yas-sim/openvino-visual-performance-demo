@@ -294,7 +294,6 @@ class benchmark():
             print('Program aborted')
 
         abort_flag = True
-        self.draw_event.set()      # wake draw thread to terminate
 
 
 
@@ -367,7 +366,7 @@ def main():
     if platform_.system() == 'Windows':
         proc.nice(psutil.HIGH_PRIORITY_CLASS) # HIGH_PRIORITY_CLASS, ABOVE_NORMAL_PRIORITY_CLASS, NORMAL_PRIORITY_CLASS, BELOW_NORMAL_PRIORITY_CLASS, IDLE_PRIORITY_CLASS
     else:
-        proc.nice(-20)
+        proc.nice(0)
 
     parser = argparse.ArgumentParser()
     parser.add_argument('-c', '--config', default='default.yml', type=str, help='Input configuration file (YAML)')
