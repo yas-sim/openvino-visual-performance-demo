@@ -88,8 +88,7 @@ class BenchmarkCanvas(FullScreenCanvas):
         x0, y0, x1, y1 = self.calcPaneCoord(idx)
         x1 -= 2
         y1 -= 2
-        #img = cv2.resize(ocvimg, (self.grid_width-2, self.grid_height-2), interpolation=cv2.INTER_NEAREST) # INTER_NEAREST for speed
-        #img = ocvimg[0:self.grid_height-2, 0:self.grid_width-2, :]
+        ocvimg = cv2.resize(ocvimg, (self.grid_width-2, self.grid_height-2), interpolation=cv2.INTER_NEAREST) # INTER_NEAREST for speed
         self.setROI(ocvimg, x0, y0, x1, y1)
 
     def markCurrentPane(self, idx=-1):
@@ -202,7 +201,6 @@ class benchmark():
         self.canvas.displayLogo()
         self.canvas.displayModel(model, device, self.batch, self.skip_count)
         self.infer_slot = [ [False, 0] for i in range(self.nireq) ]   # [Inuse flag, ocvimg index]
-        self.draw_event = threading.Event()
         self.draw_requests = []
         self.draw_requests_lock = threading.Lock()
 
@@ -269,7 +267,7 @@ class benchmark():
                     ocvimg = self.ocvImages[ocvIdx].copy()
                     idx = (res.argsort())[::-1]
                     txt = self.labels[idx[0]]
-                    cv2.putText(ocvimg, txt, (0, ocvimg.shape[-2]//2), cv2.FONT_HERSHEY_PLAIN, 2, (  0,  0,  0), 5 )
+                    cv2.putText(ocvimg, txt, (0, ocvimg.shape[-2]//2), cv2.FONT_HERSHEY_PLAIN, 2, (  0,  0,  0), 3 )
                     cv2.putText(ocvimg, txt, (0, ocvimg.shape[-2]//2), cv2.FONT_HERSHEY_PLAIN, 2, (255,255,255), 2 )
                     self.canvas.displayPane(ocvimg)
 
@@ -336,9 +334,7 @@ def init():
     glClearColor(0.0, 0.0, 0.0, 0.0)
 
 def idle():
-    global abort_flag
-    if abort_flag == True:
-        sys.exit(0)
+    return
 
 def timer(val):
     global abort_flag
@@ -401,13 +397,17 @@ def main():
         'niter'  :config['iteration'], 
         'nireq'  :config['num_requests'], 
         'max_fps':config['fps_max_value']})
+    th.setDaemon(True)
     th.start()
 
     glutInitWindowPosition(0, 0)
     glutInitWindowSize(*disp_res)
     glutInit(sys.argv)
     glutInitDisplayMode(GLUT_RGBA | GLUT_DOUBLE )
-    glutEnterGameMode()
+    if config['full_screen'] == True:
+        glutEnterGameMode()
+    else:
+        glutCreateWindow('performance demo')
     glutDisplayFunc(draw)
     glutReshapeFunc(reshape)
     glutKeyboardFunc(keyboard)
