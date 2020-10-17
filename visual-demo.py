@@ -2,6 +2,8 @@ import os
 import sys
 import glob
 import time
+import psutil
+import platform as platform_
 import argparse
 import threading
 from abc import abstractmethod
@@ -55,8 +57,8 @@ class BenchmarkCanvas(FullScreenCanvas):
         self.disp_res = display_resolution
 
         # Grid area to display inference result
-        self.grid_col = 10
-        self.grid_row = 5
+        self.grid_col = 15
+        self.grid_row = 7
         self.grid_area = [(0,0), (int(self.shape[1]), int(self.shape[0]*3/4))]
         self.grid_width  = int((self.grid_area[1][0]-self.grid_area[0][0])/self.grid_col)
         self.grid_height = int((self.grid_area[1][1]-self.grid_area[0][1])/self.grid_row)
@@ -130,7 +132,7 @@ class BenchmarkCanvas(FullScreenCanvas):
         tt = int(max(tt,1))
         txt = 'model: {} ({})'.format(name, device)
         cv2.putText(canvas, txt, (gs*1, stsY+gs* 8), cv2.FONT_HERSHEY_PLAIN, ts, (255,255,255), tt)
-        txt = 'batch: {}'.format(batch)
+        txt = 'batch: {}, skip_frame {}'.format(batch, skip_count)
         cv2.putText(canvas, txt, (gs*1, stsY+gs*10), cv2.FONT_HERSHEY_PLAIN, ts, (255,255,255), tt)
 
     # elapse = sec
@@ -199,7 +201,6 @@ class benchmark():
         self.skip_count = self.config['display_skip_count']
         self.canvas.displayLogo()
         self.canvas.displayModel(model, device, self.batch, self.skip_count)
-        self.thread_abort_flag = False
         self.infer_slot = [ [False, 0] for i in range(self.nireq) ]   # [Inuse flag, ocvimg index]
         self.draw_event = threading.Event()
         self.draw_requests = []
@@ -229,21 +230,6 @@ class benchmark():
             self.ocvImages.append(ocvimg)
             self.blobImages.append(blobimg)
 
-    # result draw thread
-    def result_drawing(self):
-        while self.thread_abort_flag == False:
-            self.draw_event.wait()
-            self.draw_event.clear()
-            if len(self.draw_requests)>0:
-                self.draw_requests_lock.acquire()
-                ocvIdx, res = self.draw_requests.pop()
-                self.draw_requests_lock.release()
-                ocvimg = self.ocvImages[ocvIdx].copy()
-                idx = (res.argsort())[::-1]
-                txt = self.labels[idx[0]]
-                cv2.putText(ocvimg, txt, (0, ocvimg.shape[-2]//2), cv2.FONT_HERSHEY_PLAIN, 2, (  0,  0,  0), 5 )
-                cv2.putText(ocvimg, txt, (0, ocvimg.shape[-2]//2), cv2.FONT_HERSHEY_PLAIN, 2, (255,255,255), 2 )
-                self.canvas.displayPane(ocvimg)
 
     def run(self, niter=10, nireq=4, files=None, max_fps=100):
         global abort_flag, framebuf_lock
@@ -253,13 +239,8 @@ class benchmark():
         for key in cfg_keys:
             print('   ', key, self.exenet.get_config(key))
 
-        self.thread_abort_flag = False
         niter = (niter//self.batch)*self.batch + (self.batch if niter % self.batch else 0)  # tweak number of iteration for batch inferencing
         self.inf_count = 0
-
-        # start result drawing thread
-        draw_thread = threading.Thread(target=self.result_drawing)
-        draw_thread.start()
 
         start = time.perf_counter()
         # Do inference
@@ -270,17 +251,12 @@ class benchmark():
             request_id = self.exenet.get_idle_request_id()
             infreq = self.exenet.requests[request_id]
 
-            # if slot has already been in use, process the infer result
+            # if slot has been already in use, process the infer result
             ocvIdx = -1
             if self.infer_slot[request_id][0] == True:
                 inf_done += self.batch
                 ocvIdx = self.infer_slot[request_id][1]   # OCV image index
                 res = infreq.output_blobs[self.outputBlobName].buffer[0].ravel()
-                if ocvIdx % 5 == 0:
-                    self.draw_requests_lock.acquire()
-                    self.draw_requests.append([ocvIdx, res])
-                    self.draw_requests_lock.release()
-                    self.draw_event.set()
                 self.infer_slot[request_id] = [False, 0]
 
             dataIdx = inf_kicked % len(self.blobImages)
@@ -288,29 +264,39 @@ class benchmark():
             infreq.async_infer(inputs={ self.inputBlobName : self.blobImages[dataIdx] } )
             inf_kicked += 1
 
-            if ocvIdx % 5 == 0:
-                framebuf_lock.acquire()
-                self.canvas.dispProgressBar(curItr=inf_done, ttlItr=niter, elapse=time.perf_counter()-start, max_fps=max_fps)
-                framebuf_lock.release()
-                self.canvas.markCurrentPane()
+            if ocvIdx != -1:
+                if ocvIdx % self.skip_count == 0:
+                    ocvimg = self.ocvImages[ocvIdx].copy()
+                    idx = (res.argsort())[::-1]
+                    txt = self.labels[idx[0]]
+                    cv2.putText(ocvimg, txt, (0, ocvimg.shape[-2]//2), cv2.FONT_HERSHEY_PLAIN, 2, (  0,  0,  0), 5 )
+                    cv2.putText(ocvimg, txt, (0, ocvimg.shape[-2]//2), cv2.FONT_HERSHEY_PLAIN, 2, (255,255,255), 2 )
+                    self.canvas.displayPane(ocvimg)
+
+                    if ocvIdx % (self.skip_count*5) == 0:
+                        framebuf_lock.acquire()
+                        self.canvas.dispProgressBar(curItr=inf_done, ttlItr=niter, elapse=time.perf_counter()-start, max_fps=max_fps)
+                        framebuf_lock.release()
+                        self.canvas.markCurrentPane()
 
             if abort_flag == True:
                 break
 
         end = time.perf_counter()
 
-        self.thread_abort_flag = True
-        self.draw_event.set()      # wake draw thread to terminate
-
         if abort_flag == False:
             # Display the rsult
             print('Time: {:8.2f} sec, Throughput: {:8.2f} inf/sec'.format(end-start, niter/(end-start)))
+            framebuf_lock.acquire()
             self.canvas.dispProgressBar(curItr=niter, ttlItr=niter, elapse=end-start, max_fps=max_fps)
+            framebuf_lock.release()
             glutPostRedisplay()
             time.sleep(5)
         else:
             print('Program aborted')
+
         abort_flag = True
+        self.draw_event.set()      # wake draw thread to terminate
 
 
 
@@ -380,6 +366,13 @@ def main():
 
     abort_flag = False
 
+    # set process priority
+    proc = psutil.Process(os.getpid())
+    if platform_.system() == 'Windows':
+        proc.nice(psutil.HIGH_PRIORITY_CLASS) # HIGH_PRIORITY_CLASS, ABOVE_NORMAL_PRIORITY_CLASS, NORMAL_PRIORITY_CLASS, BELOW_NORMAL_PRIORITY_CLASS, IDLE_PRIORITY_CLASS
+    else:
+        proc.nice(-20)
+
     parser = argparse.ArgumentParser()
     parser.add_argument('-c', '--config', default='default.yml', type=str, help='Input configuration file (YAML)')
     args = parser.parse_args()
@@ -423,7 +416,7 @@ def main():
     glutTimerFunc(33, timer, 0)
     glutMainLoop()
 
-    return 1
+    return 0
 
 if __name__ == '__main__':
     sys.exit(main())

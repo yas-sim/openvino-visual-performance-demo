@@ -39,4 +39,4 @@ plugin_config:
 fps_max_value: 100
 
 # Update screen every 'display_skip_count' inferences
-display_skip_count: 10
+display_skip_count: 1
