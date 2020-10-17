@@ -86,9 +86,9 @@ class BenchmarkCanvas(FullScreenCanvas):
         x0, y0, x1, y1 = self.calcPaneCoord(idx)
         x1 -= 2
         y1 -= 2
-        img = cv2.resize(ocvimg, (self.grid_width-2, self.grid_height-2))
+        #img = cv2.resize(ocvimg, (self.grid_width-2, self.grid_height-2), interpolation=cv2.INTER_NEAREST) # INTER_NEAREST for speed
         #img = ocvimg[0:self.grid_height-2, 0:self.grid_width-2, :]
-        self.setROI(img, x0, y0, x1, y1)
+        self.setROI(ocvimg, x0, y0, x1, y1)
 
     def markCurrentPane(self, idx=-1):
         if idx == -1:
@@ -107,14 +107,14 @@ class BenchmarkCanvas(FullScreenCanvas):
         if os.path.isdir('logo'):
             tmpimg = cv2.imread(logo1)
             h = tmpimg.shape[0]
-            tmpimg = cv2.resize(tmpimg, None, fx=(gs*4)/h, fy=(gs*4)/h)    # Logo height = 3*gs
+            tmpimg = cv2.resize(tmpimg, None, fx=(gs*4)/h, fy=(gs*4)/h, interpolation=cv2.INTER_LINEAR)    # Logo height = 3*gs
             self.displayOcvImage(tmpimg, gs*26, stsY+gs*7)
 
             tmpimg = cv2.imread(logo2, cv2.IMREAD_UNCHANGED)
             b,g,r,alpha = cv2.split(tmpimg)
             tmpimg = cv2.merge([alpha,alpha,alpha])
             h = tmpimg.shape[0]
-            tmpimg = cv2.resize(tmpimg, None, fx=(gs*4)/h, fy=(gs*4)/h) 
+            tmpimg = cv2.resize(tmpimg, None, fx=(gs*4)/h, fy=(gs*4)/h, interpolation=cv2.INTER_LINEAR) 
             self.displayOcvImage(tmpimg, gs*32, stsY+gs*7)
         else:
             cv2.putText(canvas, 'OpenVINO', (gs*32, stsY+gs*9), cv2.FONT_HERSHEY_PLAIN, 5, (255,255,255), 5)
@@ -201,6 +201,9 @@ class benchmark():
         self.canvas.displayModel(model, device, self.batch, self.skip_count)
         self.thread_abort_flag = False
         self.infer_slot = [ [False, 0] for i in range(self.nireq) ]   # [Inuse flag, ocvimg index]
+        self.draw_event = threading.Event()
+        self.draw_requests = []
+        self.draw_requests_lock = threading.Lock()
 
     def read_labels(self):
         if 'label_file' in self.config['model_config']:
@@ -215,13 +218,32 @@ class benchmark():
         self.blobImages = []
         self.ocvImages = []
         for f in files:
-            img = cv2.imread(f)
-            img = cv2.resize(img, (self.inputShape[-1], self.inputShape[-2]))
-            blobimg = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+            orgimg = cv2.imread(f)
+            # preprocess for inference
+            blobimg = cv2.resize(orgimg, (self.inputShape[-1], self.inputShape[-2]), interpolation=cv2.INTER_LINEAR)
+            blobimg = cv2.cvtColor(blobimg, cv2.COLOR_BGR2RGB)
             blobimg = blobimg.transpose((2,0,1))
             blobimg = blobimg.reshape(self.inputShape[1:])
-            self.ocvImages.append(img)
+            # scaling for image to display in the panes
+            ocvimg = cv2.resize(orgimg, (self.canvas.grid_width-2, self.canvas.grid_height-2), interpolation=cv2.INTER_LINEAR)
+            self.ocvImages.append(ocvimg)
             self.blobImages.append(blobimg)
+
+    # result draw thread
+    def result_drawing(self):
+        while self.thread_abort_flag == False:
+            self.draw_event.wait()
+            self.draw_event.clear()
+            if len(self.draw_requests)>0:
+                self.draw_requests_lock.acquire()
+                ocvIdx, res = self.draw_requests.pop()
+                self.draw_requests_lock.release()
+                ocvimg = self.ocvImages[ocvIdx].copy()
+                idx = (res.argsort())[::-1]
+                txt = self.labels[idx[0]]
+                cv2.putText(ocvimg, txt, (0, ocvimg.shape[-2]//2), cv2.FONT_HERSHEY_PLAIN, 2, (  0,  0,  0), 5 )
+                cv2.putText(ocvimg, txt, (0, ocvimg.shape[-2]//2), cv2.FONT_HERSHEY_PLAIN, 2, (255,255,255), 2 )
+                self.canvas.displayPane(ocvimg)
 
     def run(self, niter=10, nireq=4, files=None, max_fps=100):
         global abort_flag, framebuf_lock
@@ -235,6 +257,10 @@ class benchmark():
         niter = (niter//self.batch)*self.batch + (self.batch if niter % self.batch else 0)  # tweak number of iteration for batch inferencing
         self.inf_count = 0
 
+        # start result drawing thread
+        draw_thread = threading.Thread(target=self.result_drawing)
+        draw_thread.start()
+
         start = time.perf_counter()
         # Do inference
         inf_kicked = 0
@@ -245,16 +271,16 @@ class benchmark():
             infreq = self.exenet.requests[request_id]
 
             # if slot has already been in use, process the infer result
+            ocvIdx = -1
             if self.infer_slot[request_id][0] == True:
                 inf_done += self.batch
                 ocvIdx = self.infer_slot[request_id][1]   # OCV image index
-                ocvimg = self.ocvImages[ocvIdx].copy()
                 res = infreq.output_blobs[self.outputBlobName].buffer[0].ravel()
-                idx = (res.argsort())[::-1]
-                txt = self.labels[idx[0]]
-                cv2.putText(ocvimg, txt, (0, ocvimg.shape[-2]//2), cv2.FONT_HERSHEY_PLAIN, 2, (  0,  0,  0), 5 )
-                cv2.putText(ocvimg, txt, (0, ocvimg.shape[-2]//2), cv2.FONT_HERSHEY_PLAIN, 2, (255,255,255), 2 )
-                self.canvas.displayPane(ocvimg)
+                if ocvIdx % 5 == 0:
+                    self.draw_requests_lock.acquire()
+                    self.draw_requests.append([ocvIdx, res])
+                    self.draw_requests_lock.release()
+                    self.draw_event.set()
                 self.infer_slot[request_id] = [False, 0]
 
             dataIdx = inf_kicked % len(self.blobImages)
@@ -262,15 +288,19 @@ class benchmark():
             infreq.async_infer(inputs={ self.inputBlobName : self.blobImages[dataIdx] } )
             inf_kicked += 1
 
-            framebuf_lock.acquire()
-            self.canvas.dispProgressBar(curItr=inf_done, ttlItr=niter, elapse=time.perf_counter()-start, max_fps=max_fps)
-            self.canvas.markCurrentPane()
-            framebuf_lock.release()
+            if ocvIdx % 5 == 0:
+                framebuf_lock.acquire()
+                self.canvas.dispProgressBar(curItr=inf_done, ttlItr=niter, elapse=time.perf_counter()-start, max_fps=max_fps)
+                framebuf_lock.release()
+                self.canvas.markCurrentPane()
 
             if abort_flag == True:
                 break
 
         end = time.perf_counter()
+
+        self.thread_abort_flag = True
+        self.draw_event.set()      # wake draw thread to terminate
 
         if abort_flag == False:
             # Display the rsult
@@ -279,7 +309,7 @@ class benchmark():
             glutPostRedisplay()
             time.sleep(5)
         else:
-            print('Benchmark aborted')
+            print('Program aborted')
         abort_flag = True
 
 
@@ -293,8 +323,8 @@ def draw():
     h, w = img.shape[:2]
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, w, h, 0, GL_RGB, GL_UNSIGNED_BYTE, img)
 
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
-    glColor3f(1.0, 1.0, 1.0)
+    #glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
+    #glColor3f(1.0, 1.0, 1.0)
 
     # Enable texture map
     glEnable(GL_TEXTURE_2D)
@@ -302,7 +332,7 @@ def draw():
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR)
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR)
 
-    # draw square
+    # draw a square
     glBegin(GL_QUADS) 
     glTexCoord2d(0.0, 1.0)
     glVertex3d(-1.0, -1.0,  0.0)
@@ -329,7 +359,7 @@ def timer(val):
     if abort_flag == True:
         sys.exit(0)
     glutPostRedisplay()
-    glutTimerFunc(33, timer, 0)
+    glutTimerFunc(33*1, timer, 0)
 
 def reshape(w, h):
     global disp_res
@@ -384,14 +414,13 @@ def main():
     glutInitWindowSize(*disp_res)
     glutInit(sys.argv)
     glutInitDisplayMode(GLUT_RGBA | GLUT_DOUBLE )
-    #glutCreateWindow("Display")
     glutEnterGameMode()
     glutDisplayFunc(draw)
     glutReshapeFunc(reshape)
     glutKeyboardFunc(keyboard)
     init()
     glutIdleFunc(None)
-    glutTimerFunc(100, timer, 0)
+    glutTimerFunc(33, timer, 0)
     glutMainLoop()
 
     return 1
