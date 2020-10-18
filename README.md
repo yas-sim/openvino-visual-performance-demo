@@ -1,12 +1,13 @@
 # OpenVINO Visual Performance Demo Program
 
 ## Overview
-This is an OpenVINO performance demo program. This program shows inferencing performance visually on the screen so that the audience can get the performance of the system and OpenVINO intuitively.  
+This is an OpenVINO performance demo program. This program demonstrates inferencing performance visually on the screen so that the audience can get the performance of the system and OpenVINO intuitively.  
 The proram supports simple image classification models models.   
 **NOTICE**  
-The program has been updated for performance up. The previous program has performance bottle neck caused by OpenCV. The new version replaced some OpenCV portion with OpenGL. Also, some features such as SSD model support is dropped to simplify the program.  
+The program has been updated for performance up. The previous version has performance bottle neck caused by OpenCV. The new version replaced some OpenCV portion with OpenGL. Also, some features such as SSD model support is dropped to simplify the program.  
 
-![screen-shot](./resources/screen-shot.png)
+### You can use this program to demonstrate side-by-side performance comparison demo of OpenVINO.  
+![video](./resources/visual-demo.gif)
 
 ## Prerequisites
 - OpenVINO 2020.4
