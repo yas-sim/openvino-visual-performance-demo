@@ -6,6 +6,10 @@ The proram supports simple image classification models models.
 **NOTICE**  
 The program has been updated for performance up. The previous version has performance bottle neck caused by OpenCV. The new version replaced some OpenCV portion with OpenGL. Also, some features such as SSD model support is dropped to simplify the program.  
 
+OpenVINOを使ったパフォーマンスデモプログラムです。推論性能を目で見てわかる形でデモしますので異なるシステムやデバイス間でのパフォーマンスの違いをわかりやすくデモできます。  
+このプログラムはいわゆる画像分類モデルのみをサポートしています。  
+最初のバージョンはOpenCVに起因するパフォーマンス問題があったのですが、一部をOpenGL化することで大幅な高速化を達成しました。また、以前のバージョンはSSDなどのモデルもサポートしていましたが遅くなるので止めました。  
+
 ### You can use this program to demonstrate side-by-side performance comparison demo of OpenVINO.  
 ![video](./resources/visual-demo.gif)
 
