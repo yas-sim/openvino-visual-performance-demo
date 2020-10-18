@@ -109,6 +109,7 @@ class BenchmarkCanvas(FullScreenCanvas):
             tmpimg = cv2.imread(logo1)
             h = tmpimg.shape[0]
             tmpimg = cv2.resize(tmpimg, None, fx=(gs*4)/h, fy=(gs*4)/h, interpolation=cv2.INTER_LINEAR)    # Logo height = 3*gs
+            tmpimg = cv2.cvtColor(tmpimg, cv2.COLOR_BGR2RGB)
             self.displayOcvImage(tmpimg, gs*26, stsY+gs*7)
 
             tmpimg = cv2.imread(logo2, cv2.IMREAD_UNCHANGED)
@@ -153,11 +154,11 @@ class BenchmarkCanvas(FullScreenCanvas):
         cv2.rectangle(img, (gs*66, stsY), (self.disp_res[0]-1, self.disp_res[1]-1), (0,0,0), -1)
 
         cv2.putText(img, 'Progress:', (gs* 1, stsY+gs*2), cv2.FONT_HERSHEY_PLAIN, ts, (255,255,255), tt)
-        progressBar(img, gs*8, stsY+gs*1, gs*64, stsY+gs*3, (curItr*100)/ttlItr, (255,255,32))
+        progressBar(img, gs*8, stsY+gs*1, gs*64, stsY+gs*3, (curItr*100)/ttlItr, ( 32,255,255))
         cv2.putText(img, '{}/{}'.format(curItr,ttlItr)          , (gs*66, stsY+gs*2), cv2.FONT_HERSHEY_PLAIN, ts, (255,255,255), tt)
 
         cv2.putText(img, 'FPS:'     , (gs*1, stsY+gs*5), cv2.FONT_HERSHEY_PLAIN, ts, (255,255,255), tt)
-        progressBar(img, gs*8, stsY+gs*4, gs*64, stsY+gs*6, (curItr*100/elapse)/max_fps, (128,255,0))
+        progressBar(img, gs*8, stsY+gs*4, gs*64, stsY+gs*6, (curItr*100/elapse)/max_fps, (  0,255,128))
         cv2.putText(img, '{:5.2f} inf/sec'.format(curItr/elapse), (gs*66, stsY+gs*5), cv2.FONT_HERSHEY_PLAIN, ts, (255,255,255), tt)
 
         cv2.putText(img, 'Time: {:5.1f} sec'.format(elapse), (gs*66, stsY+gs*8), cv2.FONT_HERSHEY_PLAIN, ts, (255,255,255), tt)
@@ -225,6 +226,7 @@ class benchmark():
             blobimg = blobimg.reshape(self.inputShape[1:])
             # scaling for image to display in the panes
             ocvimg = cv2.resize(orgimg, (self.canvas.grid_width-2, self.canvas.grid_height-2), interpolation=cv2.INTER_LINEAR)
+            ocvimg = cv2.cvtColor(ocvimg, cv2.COLOR_BGR2RGB)
             self.ocvImages.append(ocvimg)
             self.blobImages.append(blobimg)
 
@@ -265,8 +267,8 @@ class benchmark():
             if ocvIdx != -1:
                 if ocvIdx % self.skip_count == 0:
                     ocvimg = self.ocvImages[ocvIdx].copy()
-                    idx = (res.argsort())[::-1]
-                    txt = self.labels[idx[0]]
+                    idx = (res.argsort())   #[::-1]
+                    txt = self.labels[idx[-1]]
                     cv2.putText(ocvimg, txt, (0, ocvimg.shape[-2]//2), cv2.FONT_HERSHEY_PLAIN, 2, (  0,  0,  0), 3 )
                     cv2.putText(ocvimg, txt, (0, ocvimg.shape[-2]//2), cv2.FONT_HERSHEY_PLAIN, 2, (255,255,255), 2 )
                     self.canvas.displayPane(ocvimg)
@@ -300,20 +302,18 @@ class benchmark():
 
 def draw():
     global canvas, framebuf_lock
+    h, w = canvas.shape[:2]
     framebuf_lock.acquire()
-    img= cv2.cvtColor(canvas,cv2.COLOR_BGR2RGB)
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, w, h, 0, GL_RGB, GL_UNSIGNED_BYTE, canvas)
     framebuf_lock.release()
-    h, w = img.shape[:2]
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, w, h, 0, GL_RGB, GL_UNSIGNED_BYTE, img)
 
     #glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
     #glColor3f(1.0, 1.0, 1.0)
 
-    # Enable texture map
-    glEnable(GL_TEXTURE_2D)
+    #glEnable(GL_TEXTURE_2D)
     # Set texture map method
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR)
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR)
+    #glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR)
+    #glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR)
 
     # draw a square
     glBegin(GL_QUADS) 
@@ -331,6 +331,11 @@ def draw():
 
 def init():
     glClearColor(0.0, 0.0, 0.0, 0.0)
+    # Enable texture map
+    glEnable(GL_TEXTURE_2D)
+    # Set texture map method
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR)
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR)
 
 def idle():
     return
