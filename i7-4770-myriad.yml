@@ -34,15 +34,15 @@ plugin_config:
   MYRIAD:
     - VPU_HW_STAGES_OPTIMIZATION: 'YES'                   # YES, NO
 #    - VPU_COMPUTE_LAYOUT: 'VPU_AUTO'                      # VPU_AUTO, VPU_NCHW, VPU_NHWC
-  GPU:
-    - TUNING_MODE: 'TUNING_DISABLED'                      # TUNING_DIABLED, TUNING_CREATE, TUNING_EXISTING
-    - CLDNN_PLUGIN_PRIORITY: '0'                          # 0-3, 0=Disable, 3=High
-    - CLDNN_PLUGIN_THROTTLE: '0'                          # 0-3, 0=Disable, 3=High (Plugin thread priority)
-    - GPU_THROUGHPUT_STREAMS: 'KEY_GPU_THROUGHPUT_AUTO'   # KEY_GPU_THROUGHPUT_AUTO, or positive integer
-    - EXCLUSIVE_ASYNC_REQUESTS: 'NO'
+#  GPU:
+#    - TUNING_MODE: 'TUNING_DISABLED'                      # TUNING_DIABLED, TUNING_CREATE, TUNING_EXISTING
+#    - CLDNN_PLUGIN_PRIORITY: '0'                          # 0-3, 0=Disable, 3=High
+#    - CLDNN_PLUGIN_THROTTLE: '0'                          # 0-3, 0=Disable, 3=High (Plugin thread priority)
+#    - GPU_THROUGHPUT_STREAMS: 'KEY_GPU_THROUGHPUT_AUTO'   # KEY_GPU_THROUGHPUT_AUTO, or positive integer
+#    - EXCLUSIVE_ASYNC_REQUESTS: 'NO'
 
 # For FPS meter scaling
 fps_max_value: 100
 
 # Update screen every 'display_skip_count' inferences
-display_skip_count: 15
+display_skip_count: 1

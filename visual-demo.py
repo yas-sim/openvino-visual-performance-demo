@@ -24,6 +24,8 @@ disp_res = [1920,1080]
 canvas = np.zeros([0], dtype=np.uint8)
 abort_flag = False
 
+framebuf_lock = threading.Lock()   # Lock object to control exclusive access from rendering and displaying (OGL)
+
 class FullScreenCanvas:
     def __init__(self, winname='noname', shape=(1080, 1920, 3), full_screen=True):
         global canvas
@@ -86,10 +88,8 @@ class BenchmarkCanvas(FullScreenCanvas):
             idx = self.idx
         self.idx = idx + 1
         x0, y0, x1, y1 = self.calcPaneCoord(idx)
-        x1 -= 2
-        y1 -= 2
         ocvimg = cv2.resize(ocvimg, (self.grid_width-2, self.grid_height-2), interpolation=cv2.INTER_NEAREST) # INTER_NEAREST for speed
-        self.setROI(ocvimg, x0, y0, x1, y1)
+        self.setROI(ocvimg, x0, y0, x1-2, y1-2)     # -2 to keep border lines
 
     def markCurrentPane(self, idx=-1):
         if idx == -1:
@@ -163,8 +163,6 @@ class BenchmarkCanvas(FullScreenCanvas):
 
         cv2.putText(img, 'Time: {:5.1f} sec'.format(elapse), (gs*66, stsY+gs*8), cv2.FONT_HERSHEY_PLAIN, ts, (255,255,255), tt)
 
-
-framebuf_lock = threading.Lock()
 
 class benchmark():
     def __init__(self, model, device='CPU', nireq=4, config=None):
@@ -247,23 +245,27 @@ class benchmark():
         inf_kicked = 0
         inf_done   = 0
         while inf_done < niter:
+            # get idle infer request slot
             self.exenet.wait(num_requests=1, timeout=WaitMode.RESULT_READY)
             request_id = self.exenet.get_idle_request_id()
             infreq = self.exenet.requests[request_id]
 
             # if slot has been already in use, process the infer result
-            ocvIdx = -1
             if self.infer_slot[request_id][0] == True:
                 inf_done += self.batch
                 ocvIdx = self.infer_slot[request_id][1]   # OCV image index
                 res = infreq.output_blobs[self.outputBlobName].buffer[0].ravel()
                 self.infer_slot[request_id] = [False, 0]
+            else:
+                ocvIdx = -1
 
+            # kick inference
             dataIdx = inf_kicked % len(self.blobImages)
             self.infer_slot[request_id] = [True, dataIdx]
             infreq.async_infer(inputs={ self.inputBlobName : self.blobImages[dataIdx] } )
             inf_kicked += 1
 
+            # deferred postprocess & rendering
             if ocvIdx != -1:
                 if ocvIdx % self.skip_count == 0:
                     ocvimg = self.ocvImages[ocvIdx].copy()
