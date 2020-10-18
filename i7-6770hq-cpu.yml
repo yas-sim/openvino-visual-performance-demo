@@ -10,7 +10,8 @@ full_screen: True
 image_source_dir: ./imagenet
 image_data_extension: jpg
 
-xml_model_path: ./public/googlenet-v1/FP16/googlenet-v1.xml
+#xml_model_path: ./public/googlenet-v1/FP16/googlenet-v1.xml
+xml_model_path: ./public/squeezenet1.1/FP16/squeezenet1.1.xml
 #xml_model_path: ./public/resnet-50/FP16/resnet-50.xml
 model_config:
   type: cnn   # cnn, ssd
@@ -31,18 +32,18 @@ plugin_config:
     - CPU_BIND_THREAD: 'YES'                              # NUMA, YES, NO
     - CPU_THROUGHPUT_STREAMS : '4'                        # KEY_CPU_THROUGHPUT_NUMA, KEY_CPU_THROUGHPUT_AUTO, or poritive integer
 #    - KEY_ENFORCE_BF16: 'YES'                             # YES, NO
-  MYRIAD:
-    - VPU_HW_STAGES_OPTIMIZATION: 'YES'                   # YES, NO
+#  MYRIAD:
+#    - VPU_HW_STAGES_OPTIMIZATION: 'YES'                   # YES, NO
 #    - VPU_COMPUTE_LAYOUT: 'VPU_AUTO'                      # VPU_AUTO, VPU_NCHW, VPU_NHWC
-  GPU:
-    - TUNING_MODE: 'TUNING_DISABLED'                      # TUNING_DIABLED, TUNING_CREATE, TUNING_EXISTING
-    - CLDNN_PLUGIN_PRIORITY: '0'                          # 0-3, 0=Disable, 3=High
-    - CLDNN_PLUGIN_THROTTLE: '0'                          # 0-3, 0=Disable, 3=High (Plugin thread priority)
-    - GPU_THROUGHPUT_STREAMS: 'GPU_THROUGHPUT_AUTO'       # GPU_THROUGHPUT_AUTO, or positive integer
-    - EXCLUSIVE_ASYNC_REQUESTS: 'NO'
+#  GPU:
+#    - TUNING_MODE: 'TUNING_DISABLED'                      # TUNING_DIABLED, TUNING_CREATE, TUNING_EXISTING
+#    - CLDNN_PLUGIN_PRIORITY: '0'                          # 0-3, 0=Disable, 3=High
+#    - CLDNN_PLUGIN_THROTTLE: '0'                          # 0-3, 0=Disable, 3=High (Plugin thread priority)
+#    - GPU_THROUGHPUT_STREAMS: 'GPU_THROUGHPUT_AUTO'       # GPU_THROUGHPUT_AUTO, or positive integer
+#    - EXCLUSIVE_ASYNC_REQUESTS: 'NO'
 
 # For FPS meter scaling
-fps_max_value: 200
+fps_max_value: 600
 
 # Update screen every 'display_skip_count' inferences
-display_skip_count: 30
+display_skip_count: 1

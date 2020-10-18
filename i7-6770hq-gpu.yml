@@ -1,6 +1,6 @@
 # i7-6770HQ-gpu.yml
 target_device: GPU
-iteration: 5000
+iteration: 1000
 num_requests: 8
 
 display_resolution: 1920x1080
@@ -32,8 +32,8 @@ plugin_config:
     - CPU_BIND_THREAD: 'YES'                              # NUMA, YES, NO
     - CPU_THROUGHPUT_STREAMS : '4'                        # KEY_CPU_THROUGHPUT_NUMA, KEY_CPU_THROUGHPUT_AUTO, or poritive integer
 #    - KEY_ENFORCE_BF16: 'YES'                             # YES, NO
-  MYRIAD:
-    - VPU_HW_STAGES_OPTIMIZATION: 'YES'                   # YES, NO
+#  MYRIAD:
+#    - VPU_HW_STAGES_OPTIMIZATION: 'YES'                   # YES, NO
 #    - VPU_COMPUTE_LAYOUT: 'VPU_AUTO'                      # VPU_AUTO, VPU_NCHW, VPU_NHWC
   GPU:
     - TUNING_MODE: 'TUNING_DISABLED'                      # TUNING_DIABLED, TUNING_CREATE, TUNING_EXISTING
