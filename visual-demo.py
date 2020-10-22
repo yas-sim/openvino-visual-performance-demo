@@ -175,7 +175,9 @@ class benchmark():
         self.read_labels()
         base, ext = os.path.splitext(model)
         self.ie = IECore()
+        print('reading the model...', end='', flush=True)
         self.net = self.ie.read_network(base+'.xml', base+'.bin')
+        print('done')
         if 'batch' in self.config['model_config']:
             self.batch = self.config['model_config']['batch']
         else:
@@ -195,7 +197,9 @@ class benchmark():
                 self.ie.set_config(cfg, device)
                 print('   ', cfg, device)
 
+        print('loading the model to the plugin...', end='', flush=True)
         self.exenet = self.ie.load_network(self.net, device, num_requests=nireq)
+        print('done')
         self.nireq = nireq
 
         disp_res = [ int(i) for i in self.config['display_resolution'].split('x') ]  # [1920,1080]
@@ -217,6 +221,7 @@ class benchmark():
 
 
     def preprocessImages(self, files):
+        print('preprocessing image files...', end='', flush=True)
         self.blobImages = []
         self.ocvImages = []
         for f in files:
@@ -230,6 +235,7 @@ class benchmark():
             # scaling for image to display in the panes
             ocvimg = cv2.resize(ocvimg, (self.canvas.grid_width-2, self.canvas.grid_height-2), interpolation=cv2.INTER_LINEAR)
             self.ocvImages.append(ocvimg)
+        print('done')
 
 
     def run(self, niter=10, nireq=4, files=None, max_fps=100):
