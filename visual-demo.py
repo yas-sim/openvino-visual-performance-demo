@@ -157,9 +157,13 @@ class BenchmarkCanvas(FullScreenCanvas):
         progressBar(img, gs*8, stsY+gs*1, gs*64, stsY+gs*3, (curItr*100)/ttlItr, ( 32,255,255))
         cv2.putText(img, '{}/{}'.format(curItr,ttlItr)          , (gs*66, stsY+gs*2), cv2.FONT_HERSHEY_PLAIN, ts, (255,255,255), tt)
 
+        try:
+            fps = (curItr/elapse)
+        except ZeroDivisionError:
+            fps = 0
         cv2.putText(img, 'FPS:'     , (gs*1, stsY+gs*5), cv2.FONT_HERSHEY_PLAIN, ts, (255,255,255), tt)
-        progressBar(img, gs*8, stsY+gs*4, gs*64, stsY+gs*6, (curItr*100/elapse)/max_fps, (  0,255,128))
-        cv2.putText(img, '{:5.2f} inf/sec'.format(curItr/elapse), (gs*66, stsY+gs*5), cv2.FONT_HERSHEY_PLAIN, ts, (255,255,255), tt)
+        progressBar(img, gs*8, stsY+gs*4, gs*64, stsY+gs*6, (fps*100)/max_fps, (  0,255,128))
+        cv2.putText(img, '{:5.2f} inf/sec'.format(fps), (gs*66, stsY+gs*5), cv2.FONT_HERSHEY_PLAIN, ts, (255,255,255), tt)
 
         cv2.putText(img, 'Time: {:5.1f} sec'.format(elapse), (gs*66, stsY+gs*8), cv2.FONT_HERSHEY_PLAIN, ts, (255,255,255), tt)
 
@@ -216,17 +220,16 @@ class benchmark():
         self.blobImages = []
         self.ocvImages = []
         for f in files:
-            orgimg = cv2.imread(f)
+            ocvimg = cv2.imread(f)
+            ocvimg = cv2.cvtColor(ocvimg, cv2.COLOR_BGR2RGB)    # Assuming to use OpenCL to display the frame buffer (RGB)
             # preprocess for inference
-            blobimg = cv2.resize(orgimg, (self.inputShape[-1], self.inputShape[-2]), interpolation=cv2.INTER_LINEAR)
-            blobimg = cv2.cvtColor(blobimg, cv2.COLOR_BGR2RGB)
+            blobimg = cv2.resize(ocvimg, (self.inputShape[-1], self.inputShape[-2]), interpolation=cv2.INTER_LINEAR)
             blobimg = blobimg.transpose((2,0,1))
             blobimg = blobimg.reshape(self.inputShape[1:])
-            # scaling for image to display in the panes
-            ocvimg = cv2.resize(orgimg, (self.canvas.grid_width-2, self.canvas.grid_height-2), interpolation=cv2.INTER_LINEAR)
-            ocvimg = cv2.cvtColor(ocvimg, cv2.COLOR_BGR2RGB)
-            self.ocvImages.append(ocvimg)
             self.blobImages.append(blobimg)
+            # scaling for image to display in the panes
+            ocvimg = cv2.resize(ocvimg, (self.canvas.grid_width-2, self.canvas.grid_height-2), interpolation=cv2.INTER_LINEAR)
+            self.ocvImages.append(ocvimg)
 
 
     def run(self, niter=10, nireq=4, files=None, max_fps=100):
@@ -240,10 +243,15 @@ class benchmark():
         niter = (niter//self.batch)*self.batch + (self.batch if niter % self.batch else 0)  # tweak number of iteration for batch inferencing
         self.inf_count = 0
 
-        start = time.perf_counter()
+        framebuf_lock.acquire()
+        self.canvas.dispProgressBar(curItr=0, ttlItr=niter, elapse=0, max_fps=max_fps)
+        framebuf_lock.release()
+        time.sleep(1)
+
         # Do inference
         inf_kicked = 0
         inf_done   = 0
+        start = time.perf_counter()
         while inf_done < niter:
             # get idle infer request slot
             self.exenet.wait(num_requests=1, timeout=WaitMode.RESULT_READY)
